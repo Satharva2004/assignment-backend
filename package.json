@@ -11,14 +11,25 @@
   "author": "",
   "license": "ISC",
   "keywords": [],
-  "description": "",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.57.4",
+    "bcryptjs": "^3.0.2",
     "dotenv": "^17.2.2",
     "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Satharva2004/assignment-backend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Satharva2004/assignment-backend/issues"
+  },
+  "homepage": "https://github.com/Satharva2004/assignment-backend#readme",
+  "description": ""
 }

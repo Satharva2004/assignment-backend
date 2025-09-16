@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import geminiRouter from "./routers/geminiRouter.js";
+import userRouter from "./routers/userRouter.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -49,10 +50,11 @@ app.use(express.json());
 
 // Routes
 app.use("/api/gemini", geminiRouter);
+app.use("/api/users", userRouter);
 
 // Health check
 app.get("/", (req, res) => {
-  res.send("✅ Gemini API service is running");
+  res.send("✅ API service is running");
 });
 
 export default app;
