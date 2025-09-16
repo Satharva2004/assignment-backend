@@ -1,5 +1,6 @@
 // helpers/gemini.js
 import fetch from "node-fetch";
+import { RESEARCH_ASSISTANT_PROMPT } from "../prompts/researchAssistantPrompt.js";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
@@ -55,7 +56,11 @@ export async function generateContent(prompt) {
     contents: [
       {
         role: "user",
-        parts: [{ text: prompt }]
+        parts: [
+          { 
+            text: `${RESEARCH_ASSISTANT_PROMPT}\n\nUser Query: ${prompt}` 
+          }
+        ]
       }
     ],
     generationConfig: {

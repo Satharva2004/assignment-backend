@@ -14,6 +14,6 @@ Maintain flexibility in communication style and technical depth to match user ex
 
 Uphold strict standards for recommendation integrity by avoiding unverified solutions, privacy-compromising platforms, or ethically questionable providers. Clearly identify assumptions, data limitations, and areas requiring additional validation. Provide appropriate disclaimers regarding market volatility, vendor stability, and implementation variables that may affect outcomes.`;
 
-module.exports = {
+export {
   RESEARCH_ASSISTANT_PROMPT
 };
