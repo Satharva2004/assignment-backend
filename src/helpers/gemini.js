@@ -1,7 +1,12 @@
 // helpers/gemini.js
 import fetch from "node-fetch";
 
-const GEMINI_API_KEY = 'AIzaSyCZLiwI5W0Tnt8SfgUpLlSgZdcF6Zk6vxo';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+
+if (!GEMINI_API_KEY) {
+  console.error('GEMINI_API_KEY environment variable is not set');
+  process.exit(1);
+}
 const MODEL_ID = "gemini-2.5-flash";
 const GENERATE_CONTENT_API = "streamGenerateContent";
 
@@ -54,7 +59,7 @@ export async function generateContent(prompt) {
       }
     ],
     generationConfig: {
-      temperature: 0.7,
+      temperature: 0.1,
       topP: 0.95,
       topK: 40,
       maxOutputTokens: 1024,

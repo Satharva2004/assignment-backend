@@ -5,20 +5,43 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import geminiRouter from "./routers/geminiRouter.js";
 
-// Get the current file and directory paths
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load .env file from the src directory
-const envPath = join(__dirname, '.env');
-console.log('Loading .env from:', envPath);
-dotenv.config({ path: envPath });
+const envPaths = [
+  join(__dirname, '..', '.env'),     
+  join(__dirname, '.env'),           
+  join(process.cwd(), '.env')        
+];
+
+let envLoaded = false;
+for (const envPath of envPaths) {
+  try {
+    const result = dotenv.config({ path: envPath });
+    if (!result.error) {
+      console.log('Successfully loaded .env from:', envPath);
+      envLoaded = true;
+      break;
+    }
+  } catch (e) {
+    console.log('Error loading .env from', envPath, ':', e.message);
+  }
+}
+
+if (!envLoaded) {
+  console.warn('Warning: No .env file found in any of the expected locations');
+}
 
 // Debug: Log environment variables
-console.log('Environment variables loaded:', {
-  PORT: process.env.PORT,
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY ? '*** (exists)' : 'Not found!'
-});
+console.log('Environment variables:');
+console.log('- PORT:', process.env.PORT || 'Not set');
+console.log('- GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '*** (exists)' : 'Not found!');
+
+// Validate required environment variables
+if (!process.env.GEMINI_API_KEY) {
+  console.error('FATAL: GEMINI_API_KEY environment variable is required');
+  process.exit(1);
+}
 
 const app = express();
 
