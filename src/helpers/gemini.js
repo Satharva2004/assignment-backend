@@ -60,17 +60,19 @@ export async function generateContent(prompt) {
   try {
     const apiKey = getApiKey(); // Get API key when function is called
     
+    console.log('Sending request to Gemini API with prompt:', prompt);
+    
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:${GENERATE_CONTENT_API}?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${apiKey}`,
       {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           contents: [
             {
-              role: "user",
+              role: 'user',
               parts: [
                 {
                   text: `${RESEARCH_ASSISTANT_PROMPT}\n\nUser: ${prompt}`,
@@ -82,24 +84,25 @@ export async function generateContent(prompt) {
             temperature: 0.7,
             topK: 40,
             topP: 0.95,
-            maxOutputTokens: 8192,
+            maxOutputTokens: 1024,
+            stopSequences: [],
           },
           safetySettings: [
             {
-              category: "HARM_CATEGORY_HARASSMENT",
-              threshold: "BLOCK_NONE",
+              category: 'HARM_CATEGORY_HARASSMENT',
+              threshold: 'BLOCK_NONE',
             },
             {
-              category: "HARM_CATEGORY_HATE_SPEECH",
-              threshold: "BLOCK_NONE",
+              category: 'HARM_CATEGORY_HATE_SPEECH',
+              threshold: 'BLOCK_NONE',
             },
             {
-              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-              threshold: "BLOCK_NONE",
+              category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+              threshold: 'BLOCK_NONE',
             },
             {
-              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-              threshold: "BLOCK_NONE",
+              category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+              threshold: 'BLOCK_NONE',
             },
           ],
         }),
@@ -114,34 +117,38 @@ export async function generateContent(prompt) {
       );
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
+    // Get the response data
+    const data = await response.json();
     let result = '';
     let sources = new Set();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n').filter(line => line.trim() !== '');
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        
-        try {
-          const data = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
-          result += data.text || '';
-          
-          if (data.citations) {
-            data.citations.forEach(citation => {
-              if (citation.url) sources.add(citation.url);
-            });
-          }
-        } catch (e) {
-          console.error('Error parsing chunk:', e);
-        }
-      }
+    
+    console.log('Gemini API Response:', JSON.stringify(data, null, 2)); // Debug log
+    
+    // Handle the response based on the expected structure
+    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      result = data.candidates[0].content.parts[0].text;
+    } else if (data.candidates?.[0]?.content?.parts?.[0]?.functionCall) {
+      result = JSON.stringify(data.candidates[0].content.parts[0].functionCall, null, 2);
+    } else if (data.candidates?.[0]?.content?.parts?.[0]?.inlineData) {
+      result = '[Binary data received]';
+    }
+    
+    // Extract sources if available
+    if (data.usageMetadata) {
+      console.log('Token usage:', data.usageMetadata);
+    }
+    
+    if (data.candidates?.[0]?.citationMetadata?.citationSources) {
+      data.candidates[0].citationMetadata.citationSources.forEach(source => {
+        if (source.uri) sources.add(source.uri);
+      });
+    }
+    
+    // Fallback to grounding metadata if no citations found
+    if (sources.size === 0 && data.candidates?.[0]?.groundingMetadata?.groundingChunks) {
+      data.candidates[0].groundingMetadata.groundingChunks.forEach(chunk => {
+        if (chunk.web?.uri) sources.add(chunk.web.uri);
+      });
     }
 
     return {
