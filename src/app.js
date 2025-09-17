@@ -6,37 +6,46 @@ import { dirname, join } from 'path';
 import geminiRouter from "./routers/geminiRouter.js";
 import userRouter from "./routers/userRouter.js";
 
+// Get the current file and directory paths
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Try to load environment variables from different possible locations
 const envPaths = [
-  join(__dirname, '..', '.env'),     
-  join(__dirname, '.env'),           
-  join(process.cwd(), '.env')        
+  join(process.cwd(), '.env'),        // Current working directory
+  join(__dirname, '..', '.env'),     // Parent directory (backend/.env)
+  join(__dirname, '.env')            // Current directory (backend/src/.env)
 ];
 
 let envLoaded = false;
 for (const envPath of envPaths) {
   try {
-    const result = dotenv.config({ path: envPath });
-    if (!result.error) {
-      console.log('Successfully loaded .env from:', envPath);
+    const result = dotenv.config({ path: envPath, override: true });
+    if (result.parsed) {
+      console.log('✅ Successfully loaded .env from:', envPath);
       envLoaded = true;
       break;
+    } else if (result.error) {
+      console.log('⚠️  Could not load .env from', envPath, ':', result.error.message);
     }
   } catch (e) {
-    console.log('Error loading .env from', envPath, ':', e.message);
+    console.error('❌ Error loading .env from', envPath, ':', e.message);
   }
 }
 
 if (!envLoaded) {
-  console.warn('Warning: No .env file found in any of the expected locations');
+  console.warn('⚠️  Could not load .env file from any of these locations:', envPaths);
+  console.warn('The application might not work correctly without environment variables.');
 }
 
-// Debug: Log environment variables
-console.log('Environment variables:');
-console.log('- PORT:', process.env.PORT || 'Not set');
-console.log('- GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '*** (exists)' : 'Not found!');
+// Log environment variable status (without sensitive values)
+console.log('\nEnvironment variables status:');
+console.log('- NODE_ENV:', process.env.NODE_ENV || 'development (default)');
+console.log('- PORT:', process.env.PORT || '5000 (default)');
+console.log('- GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '***set***' : '❌ not set');
+console.log('- SUPABASE_URL:', process.env.SUPABASE_URL ? '***set***' : '❌ not set');
+console.log('- JWT_SECRET:', process.env.JWT_SECRET ? '***set***' : '❌ not set');
+console.log('');
 
 // Validate required environment variables
 if (!process.env.GEMINI_API_KEY) {

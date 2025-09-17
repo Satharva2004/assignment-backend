@@ -2,16 +2,12 @@
 import fetch from "node-fetch";
 import { RESEARCH_ASSISTANT_PROMPT } from "../prompts/researchAssistantPrompt.js";
 
-// Don't check API key at module load time
-// Let the function handle it when called
-function getApiKey() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.error('GEMINI_API_KEY environment variable is not set');
-    console.log('Current environment variables:', Object.keys(process.env));
-    throw new Error('GEMINI_API_KEY environment variable is not set');
-  }
-  return apiKey;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+if (!GEMINI_API_KEY) {
+  console.warn('⚠️  GEMINI_API_KEY environment variable is not set. The Gemini API will not work until this is configured.');
+  console.warn('Please add your Gemini API key to the .env file in the backend directory.');
+  console.warn('Example: GEMINI_API_KEY=your_api_key_here');
 }
 const MODEL_ID = "gemini-2.5-flash";
 const GENERATE_CONTENT_API = "streamGenerateContent";
@@ -57,106 +53,90 @@ function processGeminiResponse(response) {
 }
 
 export async function generateContent(prompt) {
-  try {
-    const apiKey = getApiKey(); // Get API key when function is called
-    
-    console.log('Sending request to Gemini API with prompt:', prompt);
-    
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${apiKey}`,
+  if (!GEMINI_API_KEY) {
+    return {
+      content: 'Error: Gemini API is not configured. Please set the GEMINI_API_KEY in your .env file.',
+      sources: [],
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  const body = {
+    contents: [
       {
-        method: 'POST',
+        role: "user",
+        parts: [
+          { 
+            text: `${RESEARCH_ASSISTANT_PROMPT}\n\nUser Query: ${prompt}` 
+          }
+        ]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      topP: 0.95,
+      topK: 40,
+      maxOutputTokens: 1024,
+      responseMimeType: "text/plain"
+    },
+    safetySettings: [
+      {
+        category: "HARM_CATEGORY_HARASSMENT",
+        threshold: "BLOCK_MEDIUM_AND_ABOVE"
+      },
+      {
+        category: "HARM_CATEGORY_HATE_SPEECH",
+        threshold: "BLOCK_MEDIUM_AND_ABOVE"
+      },
+      {
+        category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        threshold: "BLOCK_MEDIUM_AND_ABOVE"
+      },
+      {
+        category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+        threshold: "BLOCK_MEDIUM_AND_ABOVE"
+      }
+    ],
+    tools: [
+      { googleSearch: {}  },
+    ],
+  };
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:${GENERATE_CONTENT_API}?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  text: `${RESEARCH_ASSISTANT_PROMPT}\n\nUser: ${prompt}`,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024,
-            stopSequences: [],
-          },
-          safetySettings: [
-            {
-              category: 'HARM_CATEGORY_HARASSMENT',
-              threshold: 'BLOCK_NONE',
-            },
-            {
-              category: 'HARM_CATEGORY_HATE_SPEECH',
-              threshold: 'BLOCK_NONE',
-            },
-            {
-              category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-              threshold: 'BLOCK_NONE',
-            },
-            {
-              category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-              threshold: 'BLOCK_NONE',
-            },
-          ],
-        }),
+        body: JSON.stringify(body),
       }
     );
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('Gemini API Error:', errorData);
-      throw new Error(
-        `Gemini API request failed with status ${response.status}: ${JSON.stringify(errorData)}`
-      );
+      console.error("Gemini API Error:", errorData);
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorData?.error?.message || 'Unknown error'}`);
     }
 
-    // Get the response data
     const data = await response.json();
-    let result = '';
-    let sources = new Set();
     
-    console.log('Gemini API Response:', JSON.stringify(data, null, 2)); // Debug log
+    // Process the response to extract clean content
+    const processed = processGeminiResponse(Array.isArray(data) ? data : [data]);
     
-    // Handle the response based on the expected structure
-    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      result = data.candidates[0].content.parts[0].text;
-    } else if (data.candidates?.[0]?.content?.parts?.[0]?.functionCall) {
-      result = JSON.stringify(data.candidates[0].content.parts[0].functionCall, null, 2);
-    } else if (data.candidates?.[0]?.content?.parts?.[0]?.inlineData) {
-      result = '[Binary data received]';
-    }
-    
-    // Extract sources if available
-    if (data.usageMetadata) {
-      console.log('Token usage:', data.usageMetadata);
-    }
-    
-    if (data.candidates?.[0]?.citationMetadata?.citationSources) {
-      data.candidates[0].citationMetadata.citationSources.forEach(source => {
-        if (source.uri) sources.add(source.uri);
-      });
-    }
-    
-    // Fallback to grounding metadata if no citations found
-    if (sources.size === 0 && data.candidates?.[0]?.groundingMetadata?.groundingChunks) {
-      data.candidates[0].groundingMetadata.groundingChunks.forEach(chunk => {
-        if (chunk.web?.uri) sources.add(chunk.web.uri);
-      });
-    }
-
+    // Return a clean, structured response
     return {
-      content: result,
-      sources: Array.from(sources)
+      content: processed.content,
+      sources: processed.sources,
+      timestamp: new Date().toISOString()
     };
   } catch (error) {
-    console.error('Error in generateContent:', error);
-    throw error;
+    console.error("Error generating content:", error);
+    return {
+      content: `Error: ${error.message}`,
+      sources: [],
+      timestamp: new Date().toISOString()
+    };
   }
 }
