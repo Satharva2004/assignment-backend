@@ -1,14 +1,10 @@
 // helpers/gemini.js
 import fetch from "node-fetch";
 import { RESEARCH_ASSISTANT_PROMPT } from "../prompts/researchAssistantPrompt.js";
+import env from "../config/env.js";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_KEY = env.GEMINI_API_KEY;
 
-if (!GEMINI_API_KEY) {
-  console.warn('⚠️  GEMINI_API_KEY environment variable is not set. The Gemini API will not work until this is configured.');
-  console.warn('Please add your Gemini API key to the .env file in the backend directory.');
-  console.warn('Example: GEMINI_API_KEY=your_api_key_here');
-}
 const MODEL_ID = "gemini-2.5-flash";
 const GENERATE_CONTENT_API = "streamGenerateContent";
 

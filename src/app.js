@@ -1,51 +1,47 @@
 // app.js
 import express from "express";
 import dotenv from "dotenv";
+import cors from "cors";
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import geminiRouter from "./routers/geminiRouter.js";
 import userRouter from "./routers/userRouter.js";
 
-// Get the current file and directory paths
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Try to load environment variables from different possible locations
 const envPaths = [
-  join(process.cwd(), '.env'),        // Current working directory
-  join(__dirname, '..', '.env'),     // Parent directory (backend/.env)
-  join(__dirname, '.env')            // Current directory (backend/src/.env)
+  join(__dirname, '..', '.env'),     
+  join(__dirname, '.env'),           
+  join(process.cwd(), '.env')        
 ];
 
 let envLoaded = false;
 for (const envPath of envPaths) {
   try {
-    const result = dotenv.config({ path: envPath, override: true });
-    if (result.parsed) {
-      console.log('✅ Successfully loaded .env from:', envPath);
-      envLoaded = true;
+    const result = dotenv.config({ path: envPath });
+    if (!result.error) {
+      console.log('Successfully loaded .env from:', envPath);
+    console.log('GEMINI_API_KEY is set:', !!process.env.GEMINI_API_KEY);
+    envLoaded = true;
       break;
-    } else if (result.error) {
-      console.log('⚠️  Could not load .env from', envPath, ':', result.error.message);
     }
   } catch (e) {
-    console.error('❌ Error loading .env from', envPath, ':', e.message);
+    console.log('Error loading .env from', envPath, ':', e.message);
   }
 }
 
 if (!envLoaded) {
-  console.warn('⚠️  Could not load .env file from any of these locations:', envPaths);
-  console.warn('The application might not work correctly without environment variables.');
+  console.error('Failed to load .env file from any location');
 }
 
-// Log environment variable status (without sensitive values)
-console.log('\nEnvironment variables status:');
-console.log('- NODE_ENV:', process.env.NODE_ENV || 'development (default)');
-console.log('- PORT:', process.env.PORT || '5000 (default)');
-console.log('- GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '***set***' : '❌ not set');
-console.log('- SUPABASE_URL:', process.env.SUPABASE_URL ? '***set***' : '❌ not set');
-console.log('- JWT_SECRET:', process.env.JWT_SECRET ? '***set***' : '❌ not set');
-console.log('');
+// Log all environment variables (excluding sensitive ones)
+console.log('Environment variables:', {
+  NODE_ENV: process.env.NODE_ENV,
+  PORT: process.env.PORT,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY ? '***set***' : '***not set***',
+  SUPABASE_URL: process.env.SUPABASE_URL ? '***set***' : '***not set***'
+});
 
 // Validate required environment variables
 if (!process.env.GEMINI_API_KEY) {
@@ -55,6 +51,30 @@ if (!process.env.GEMINI_API_KEY) {
 
 const app = express();
 
+// CORS configuration
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5000', // Development
+  'https://deepsearch-assignment.vercel.app', // Production
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes
