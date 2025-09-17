@@ -53,9 +53,9 @@ const app = express();
 
 // CORS configuration
 const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5000', // Development
-  'https://deepsearch-assignment.vercel.app', // Production
+  'http://localhost:3000', // Development
+  'https://assignment-backend-one-khaki.vercel.app', // Production Backend
+  'https://deepsearch-assignment.vercel.app' // Production Frontend
 ];
 
 const corsOptions = {
@@ -65,16 +65,23 @@ const corsOptions = {
     
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      console.warn('CORS blocked request from origin:', origin);
       return callback(new Error(msg), false);
     }
     return callback(null, true);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  optionsSuccessStatus: 200, // Some legacy browsers (IE11, various SmartTVs) choke on 204
+  preflightContinue: false
 };
 
+// Apply CORS middleware
 app.use(cors(corsOptions));
+
+// Handle preflight requests
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
 // Routes
