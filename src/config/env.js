@@ -34,7 +34,7 @@ if (missingVars.length > 0) {
   process.exit(1);
 }
 
-// Log environment status
+// Log environment statusssss
 console.log('\n📋 Environment Configuration:');
 console.log('='.repeat(50));
 console.log(`- NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
