@@ -202,13 +202,9 @@ function processGeminiResponse(response) {
   };
 }
 
-
-function buildRequestBody(messages, includeSearch = true) {
+function buildRequestBody(messages, systemPrompt = null, includeSearch = true) {
   const body = {
-    contents: messages.map(msg => ({
-      role: msg.role,
-      parts: msg.parts
-    })),
+    contents: messages,
     generationConfig: {
       temperature: 0.1, 
       topP: 0.95,
@@ -236,6 +232,13 @@ function buildRequestBody(messages, includeSearch = true) {
       }
     ]
   };
+
+  // Add system instruction if provided
+  if (systemPrompt) {
+    body.systemInstruction = {
+      parts: [{ text: systemPrompt }]
+    };
+  }
 
   if (includeSearch) {
     body.tools = [{ googleSearch: {} }];
@@ -290,23 +293,13 @@ export async function generateContent(
       parts: [{ text: prompt }]
     };
 
-    let messages = [];
+    let messages = [...userHistory, userMessage];
     
-    // Only add system prompt for new conversations
-    if (userHistory.length === 0) {
-      messages.push({
-        role: 'user',
-        parts: [{ text: `${systemPrompt}\n\n${prompt}` }]
-      });
-    } else {
-      // Use existing history + new message
-      messages = [
-        ...userHistory.slice(-(CONFIG.MAX_HISTORY_LENGTH * 2)),
-        userMessage
-      ];
-    }
+    // Ensure we don't exceed max history length and only include valid roles
+    const validMessages = messages.filter(m => m.role === 'user' || m.role === 'model');
+    messages = validMessages.slice(-(CONFIG.MAX_HISTORY_LENGTH * 2));
 
-    const requestBody = buildRequestBody(messages, options.includeSearch !== false);
+    const requestBody = buildRequestBody(messages, systemPrompt, options.includeSearch !== false);
     let lastError = null;
     let attemptsCount = 0;
     const maxAttempts = Math.min(GEMINI_API_KEYS.length * 2, 5); // Limit total attempts
@@ -388,15 +381,8 @@ export async function generateContent(
         if (result.content?.trim()) {
           const updatedHistory = [...userHistory];
           
-          // Add user message (without system prompt for history)
-          if (userHistory.length === 0) {
-            updatedHistory.push({
-              role: 'user',
-              parts: [{ text: prompt }] // Store without system prompt
-            });
-          } else {
-            updatedHistory.push(userMessage);
-          }
+          // Add user message
+          updatedHistory.push(userMessage);
           
           // Add assistant response
           updatedHistory.push({
