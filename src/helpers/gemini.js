@@ -196,15 +196,13 @@ function processGeminiResponse(response) {
     console.error('Error processing Gemini response:', error);
     result.content = `Error processing response: ${error.message}`;
   }
-
-  // Convert sources Set back to array
   return {
     content: result.content,
     sources: Array.from(result.sources)
   };
 }
 
-// Enhanced request builder with better safety settings
+
 function buildRequestBody(messages, includeSearch = true) {
   const body = {
     contents: messages.map(msg => ({
@@ -212,35 +210,33 @@ function buildRequestBody(messages, includeSearch = true) {
       parts: msg.parts
     })),
     generationConfig: {
-      temperature: 0.7, // Increased from 0.1 for more creative responses
+      temperature: 0.1, 
       topP: 0.95,
       topK: 40,
       maxOutputTokens: CONFIG.MAX_OUTPUT_TOKENS,
       candidateCount: 1,
-      stopSequences: [] // Ensure no premature stopping
+      stopSequences: []
     },
-    // More lenient safety settings to prevent blocking
     safetySettings: [
       {
         category: "HARM_CATEGORY_HARASSMENT",
-        threshold: "BLOCK_ONLY_HIGH"  // Changed from MEDIUM_AND_ABOVE
+        threshold: "BLOCK_ONLY_HIGH"
       },
       {
         category: "HARM_CATEGORY_HATE_SPEECH", 
-        threshold: "BLOCK_ONLY_HIGH"  // Changed from MEDIUM_AND_ABOVE
+        threshold: "BLOCK_ONLY_HIGH" 
       },
       {
         category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-        threshold: "BLOCK_ONLY_HIGH"  // Changed from MEDIUM_AND_ABOVE
+        threshold: "BLOCK_ONLY_HIGH" 
       },
       {
         category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-        threshold: "BLOCK_ONLY_HIGH"  // Changed from MEDIUM_AND_ABOVE
+        threshold: "BLOCK_ONLY_HIGH" 
       }
     ]
   };
 
-  // Only add tools if requested
   if (includeSearch) {
     body.tools = [{ googleSearch: {} }];
   }
@@ -249,7 +245,6 @@ function buildRequestBody(messages, includeSearch = true) {
   return body;
 }
 
-// Timeout wrapper for fetch requests
 async function fetchWithTimeout(url, options, timeout = CONFIG.REQUEST_TIMEOUT) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
