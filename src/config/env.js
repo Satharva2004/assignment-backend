@@ -1,27 +1,24 @@
 import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'node:url';
-import fs from 'fs';
 
-// Get the current file and directory paths
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Path to .env file
-const envPath = path.resolve(__dirname, '../../.env');
-
-// Check if .env file exists
-if (!fs.existsSync(envPath)) {
-  console.error('❌ .env file not found at:', envPath);
-  process.exit(1);
-}
-
-// Load environment variables from .env file
-const result = dotenv.config({ path: envPath });
-
-if (result.error) {
-  console.error('❌ Error loading .env file:', result.error);
-  process.exit(1);
+// Load environment variables from .env file in development
+if (process.env.NODE_ENV !== 'production') {
+  const path = await import('path');
+  const { fileURLToPath } = await import('node:url');
+  const fs = await import('fs');
+  
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const envPath = path.resolve(__dirname, '../../.env');
+  
+  if (fs.existsSync(envPath)) {
+    const result = dotenv.config({ path: envPath });
+    if (result.error) {
+      console.error('❌ Error loading .env file:', result.error);
+      process.exit(1);
+    }
+  } else {
+    console.warn('⚠️  .env file not found, using environment variables from Vercel');
+  }
 }
 
 // Verify required environment variables
@@ -30,11 +27,15 @@ const missingVars = requiredEnvVars.filter(varName => !process.env[varName]?.tri
 
 if (missingVars.length > 0) {
   console.error('❌ Missing required environment variables:', missingVars.join(', '));
-  console.error('Please check your .env file at:', envPath);
+  if (process.env.NODE_ENV !== 'production') {
+    console.error('Please check your .env file at:', path.resolve(__dirname, '../../.env'));
+  } else {
+    console.error('Please set these environment variables in your Vercel project settings');
+  }
   process.exit(1);
 }
 
-// Log environment statusssss
+// Log environment status
 console.log('\n📋 Environment Configuration:');
 console.log('='.repeat(50));
 console.log(`- NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
