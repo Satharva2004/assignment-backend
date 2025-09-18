@@ -3,9 +3,13 @@ import fetch from "node-fetch";
 import { RESEARCH_ASSISTANT_PROMPT } from "../prompts/researchAssistantPrompt.js";
 import env from "../config/env.js";
 
-const GEMINI_API_KEY = env.GEMINI_API_KEY;
+const GEMINI_API_KEYS = [
+  env.GEMINI_API_KEY,
+  env.GEMINI_API_KEY2 
+].filter(Boolean);
 
 const MODEL_ID = "gemini-2.5-flash";
+let currentKeyIndex = 0;
 const GENERATE_CONTENT_API = "streamGenerateContent";
 
 function processGeminiResponse(response) {
@@ -69,9 +73,9 @@ const chatHistory = new Map(); // userId -> messageHistory[]
 const MAX_HISTORY_LENGTH = 5; // Keep last 5 exchanges in history
 
 export async function generateContent(prompt, userId = 'default', systemPrompt = RESEARCH_ASSISTANT_PROMPT) {
-  if (!GEMINI_API_KEY) {
+  if (!GEMINI_API_KEYS || GEMINI_API_KEYS.length === 0) {
     return {
-      content: 'Error: Gemini API is not configured. Please set the GEMINI_API_KEY in your .env file.',
+      content: 'Error: No Gemini API keys configured. Please set at least one GEMINI_API_KEY in your .env file.',
       sources: [],
       timestamp: new Date().toISOString()
     };
@@ -143,60 +147,61 @@ export async function generateContent(prompt, userId = 'default', systemPrompt =
   // Always enable web search for grounding
   body.tools = [{ googleSearch: {} }];
 
-  try {
-    console.log('Sending request to Gemini API with body:', JSON.stringify(body, null, 2));
-    
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:${GENERATE_CONTENT_API}?key=${GEMINI_API_KEY}`;
-    
-    console.log('Sending request to Gemini API:', {
-      url,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body, null, 2)
-    });
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
-    const data = await response.json().catch(e => ({}));
-    
-    if (!response.ok) {
-      console.error('Gemini API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        data
+  let lastError = null;
+  let result = { content: '', sources: [] };
+  
+  // Try each API key until one works
+  for (let i = 0; i < GEMINI_API_KEYS.length; i++) {
+    const currentKey = GEMINI_API_KEYS[currentKeyIndex];
+    try {
+      console.log(`Using API key index: ${currentKeyIndex}`);
+      console.log('Sending request to Gemini API with body:', JSON.stringify(body, null, 2));
+      
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:${GENERATE_CONTENT_API}?key=${currentKey}`;
+      
+      console.log('Sending request to Gemini API:', {
+        url: url.replace(currentKey, '***MASKED***'), // Don't log full key
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
       });
-      throw new Error(data?.error?.message || `HTTP error! status: ${response.status}`);
-    }
 
-    console.log('Received response from Gemini API:', JSON.stringify(data, null, 2));
-    
-    // Process the response to extract clean content
-    let result = { content: '', sources: [] };
-    
-    // Handle both stream and non-stream responses
-    if (data.candidates) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      const data = await response.json().catch(e => ({}));
+      
+      if (!response.ok) {
+        lastError = new Error(data?.error?.message || `HTTP error! status: ${response.status}`);
+        
+        // If rate limited or service unavailable, try next key
+        if (response.status === 429 || response.status === 503) {
+          console.warn(`API key ${currentKeyIndex} rate limited or unavailable, trying next key...`);
+          currentKeyIndex = (currentKeyIndex + 1) % GEMINI_API_KEYS.length;
+          continue;
+        }
+        
+        console.error('Gemini API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          data
+        });
+        throw lastError;
+      }
+      
+      // Process the successful response
       result = processGeminiResponse(data);
-    } else if (data[0]?.candidates) {
-      result = processGeminiResponse(data);
-    } else {
-      console.error('Unexpected response format:', JSON.stringify(data, null, 2));
-      result.content = 'Error: Unexpected response format from Gemini API';
-    }
-    
-    // Add assistant's response to history
-    if (result.content) {
-      // Only add to history if the message is not empty
-      if (userMessage.parts[0].text.trim()) {
+      
+      // Add assistant's response to history if we have content
+      if (result.content && userMessage.parts[0].text.trim()) {
         userHistory.push(userMessage);
         userHistory.push({
           role: 'model',
           parts: [{ text: result.content }]
         });
-        
+
         // Trim history if it exceeds max length (keep last N exchanges)
         if (userHistory.length > MAX_HISTORY_LENGTH * 2) {
           userHistory.splice(0, userHistory.length - (MAX_HISTORY_LENGTH * 2));
@@ -205,18 +210,28 @@ export async function generateContent(prompt, userId = 'default', systemPrompt =
         // Update chat history
         chatHistory.set(userId, userHistory);
       }
+      
+      return result;
+      
+    } catch (error) {
+      lastError = error;
+      console.error(`Attempt ${i + 1} failed with error:`, error.message);
+      
+      // If not the last key, continue to next iteration
+      if (i < GEMINI_API_KEYS.length - 1) {
+        currentKeyIndex = (currentKeyIndex + 1) % GEMINI_API_KEYS.length;
+        continue;
+      }
     }
-    
-    return {
-      ...result,
-      timestamp: new Date().toISOString()
-    };
-  } catch (error) {
-    console.error("Error generating content:", error);
-    return {
-      content: `Error: ${error.message}`,
-      sources: [],
-      timestamp: new Date().toISOString()
-    };
   }
+  
+  // If we get here, all keys failed
+  const error = lastError || new Error('All API keys failed');
+  console.error('All API keys failed:', error);
+  
+  return {
+    content: `Error: ${error.message}`,
+    sources: [],
+    timestamp: new Date().toISOString()
+  };
 }
