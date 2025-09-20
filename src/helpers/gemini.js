@@ -1,7 +1,23 @@
 // helpers/gemini.js
 import fetch from "node-fetch";
 import { RESEARCH_ASSISTANT_PROMPT } from "../prompts/researchAssistantPrompt.js";
+import { REAL_ESTATE_EXPERT_PROMPT } from "../prompts/realestateexpert.js";
+import { CRYPTO_EXPERT_PROMPT } from "../prompts/cryptoexpert.js";
+import { PORTFOLIO_EXPERT_PROMPT as INVESTMENT_EXPERT_PROMPT } from "../prompts/investmentexpert.js";
+import { STOCK_EXPERT_PROMPT } from "../prompts/stockexpert.js";
+import { RETIREMENT_TAX_EXPERT_PROMPT } from "../prompts/retierment_tax_expert.js";
 import env from "../config/env.js";
+
+// Map of expert types to their corresponding prompts
+const EXPERT_PROMPTS = {
+  'research': RESEARCH_ASSISTANT_PROMPT,
+  'real-estate': REAL_ESTATE_EXPERT_PROMPT,
+  'crypto': CRYPTO_EXPERT_PROMPT,
+  'investment': INVESTMENT_EXPERT_PROMPT,
+  'stock': STOCK_EXPERT_PROMPT,
+  'retirement-tax': RETIREMENT_TAX_EXPERT_PROMPT,
+  'default': RESEARCH_ASSISTANT_PROMPT
+};
 
 const GEMINI_API_KEYS = [
   env.GEMINI_API_KEY,
@@ -235,9 +251,24 @@ function buildRequestBody(messages, systemPrompt = null, includeSearch = true) {
 
   // Add system instruction if provided
   if (systemPrompt) {
+    // Ensure system instruction is given highest priority
     body.systemInstruction = {
-      parts: [{ text: systemPrompt }]
+      role: 'system',
+      parts: [{ 
+        text: systemPrompt + "\n\nRemember: Follow all instructions exactly as given, including response formatting requirements."
+      }]
     };
+    
+    // Also add as the first message to reinforce the instruction
+    if (body.contents && body.contents.length > 0) {
+      body.contents = [
+        {
+          role: 'user',
+          parts: [{ text: 'IMPORTANT: Follow all instructions in the system prompt exactly, including any required response formatting.' }]
+        },
+        ...body.contents
+      ];
+    }
   }
 
   if (includeSearch) {
@@ -267,12 +298,32 @@ async function fetchWithTimeout(url, options, timeout = CONFIG.REQUEST_TIMEOUT) 
 const chatHistory = new ChatHistoryManager();
 const keyManager = new APIKeyManager(GEMINI_API_KEYS);
 
+/**
+ * Generate content using Gemini API
+ * @param {string} prompt - The user's input prompt
+ * @param {string} userId - Unique identifier for the user's chat session
+ * @param {Object} options - Additional options
+ * @param {string} [options.expert='research'] - The expert type to use (research, real-estate, crypto, etc.)
+ * @param {string} [options.systemPrompt] - Optional custom system prompt (overrides expert prompt if provided)
+ * @param {boolean} [options.includeSearch=true] - Whether to include web search
+ * @returns {Promise<Object>} - The generated content response
+ */
+/**
+ * Generate content using Gemini API
+ * @param {string} prompt - The user's input prompt
+ * @param {string} [userId='default'] - Unique identifier for the user's chat session
+ * @param {Object} [options={}] - Additional options
+ * @param {string} [options.expert='research'] - The expert type to use
+ * @param {string} [options.systemPrompt] - Custom system prompt (overrides expert prompt)
+ * @param {boolean} [options.includeSearch=true] - Whether to include web search
+ * @returns {Promise<Object>} The generated content response
+ */
 export async function generateContent(
   prompt, 
-  userId = 'default', 
-  systemPrompt = RESEARCH_ASSISTANT_PROMPT,
+  userId = 'default',
   options = {}
 ) {
+  console.log('generateContent called with:', { prompt, userId, options });
   // Validate API keys
   if (!GEMINI_API_KEYS?.length) {
     return {
@@ -286,6 +337,26 @@ export async function generateContent(
   const startTime = Date.now();
   
   try {
+    // Select the appropriate system prompt based on expert type
+    const expertType = (options.expert || 'research').toLowerCase();
+    const customSystemPrompt = options.systemPrompt;
+    const selectedSystemPrompt = customSystemPrompt || EXPERT_PROMPTS[expertType] || EXPERT_PROMPTS.default;
+    
+    console.log('=== Expert Selection ===');
+    console.log('Requested expert type:', expertType);
+    console.log('Available expert types:', Object.keys(EXPERT_PROMPTS));
+    console.log('Using custom system prompt:', customSystemPrompt ? 'Yes' : 'No');
+    
+    if (customSystemPrompt) {
+      console.log('Using provided custom system prompt');
+    } else if (EXPERT_PROMPTS[expertType]) {
+      console.log(`Using expert prompt for: ${expertType}`);
+      console.log('Prompt starts with:', EXPERT_PROMPTS[expertType].substring(0, 100) + '...');
+    } else {
+      console.warn(`Unknown expert type: ${expertType}. Using default research assistant prompt.`);
+      console.log('Default prompt starts with:', EXPERT_PROMPTS.default.substring(0, 100) + '...');
+    }
+
     // Get user history and prepare messages
     const userHistory = chatHistory.get(userId);
     const userMessage = {
@@ -299,7 +370,7 @@ export async function generateContent(
     const validMessages = messages.filter(m => m.role === 'user' || m.role === 'model');
     messages = validMessages.slice(-(CONFIG.MAX_HISTORY_LENGTH * 2));
 
-    const requestBody = buildRequestBody(messages, systemPrompt, options.includeSearch !== false);
+    const requestBody = buildRequestBody(messages, selectedSystemPrompt, options.includeSearch !== false);
     let lastError = null;
     let attemptsCount = 0;
     const maxAttempts = Math.min(GEMINI_API_KEYS.length * 2, 5); // Limit total attempts

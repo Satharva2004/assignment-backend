@@ -8,13 +8,33 @@ export async function handleGenerate(req, res) {
       return res.status(400).json({ error: "Request body is required" });
     }
     
-    const { prompt } = req.body;
+    const { prompt, options = {} } = req.body;
     if (!prompt) {
       return res.status(400).json({ error: "Prompt is required in the request body" });
     }
 
-    console.log('Calling Gemini API with prompt:', prompt);
-    const result = await generateContent(prompt);
+    const userId = req.user?.id || 'anonymous';
+    const { expert, systemPrompt, includeSearch } = options;
+    
+    console.log('Calling Gemini API with:', { 
+      prompt, 
+      userId,
+      options: {
+        expert,
+        systemPrompt: systemPrompt ? '***provided***' : 'not provided',
+        includeSearch: includeSearch !== false // default to true if not specified
+      }
+    });
+    
+    const result = await generateContent(
+      prompt, 
+      userId,
+      {
+        expert,
+        systemPrompt,
+        includeSearch: includeSearch !== false
+      }
+    );
     console.log('Received response from Gemini API');
     
     res.json(result);
