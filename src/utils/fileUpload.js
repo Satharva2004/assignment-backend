@@ -6,15 +6,30 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const createUploadsDir = () => {
-  const uploadsDir = path.join(__dirname, '../../uploads');
+  // In production, use the system's temp directory
+  // In development, use a local uploads directory
+  const baseDir = process.env.NODE_ENV === 'production' 
+    ? require('os').tmpdir() 
+    : path.join(__dirname, '../../uploads');
   
-  // Create uploads directory if it doesn't exist
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-    console.log('Created uploads directory at:', uploadsDir);
+  const uploadsDir = path.join(baseDir, 'eduvance-uploads');
+  
+  try {
+    // Create uploads directory if it doesn't exist
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true, mode: 0o755 });
+      console.log('Created uploads directory at:', uploadsDir);
+    }
+    
+    // Verify directory is writable
+    fs.accessSync(uploadsDir, fs.constants.W_OK);
+    
+    return uploadsDir;
+  } catch (error) {
+    console.error('Error setting up uploads directory:', error.message);
+    console.warn('Falling back to system temp directory');
+    return require('os').tmpdir();
   }
-  
-  return uploadsDir;
 };
 
 export const deleteFile = (filePath) => {
