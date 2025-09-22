@@ -55,7 +55,8 @@ const app = express();
 const allowedOrigins = [
   'http://localhost:3000', // Development
   'https://assignment-backend-one-khaki.vercel.app', // Production Backend
-  'https://deepsearch-assignment.vercel.app' // Production Frontend
+  'https://deepsearch-assignment.vercel.app', // Production Frontend
+  'https://finance-u.vercel.app' //FinanceU
 ];
 
 // Enable CORS for all routes
