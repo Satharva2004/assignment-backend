@@ -24,23 +24,40 @@ export const convertSpeechToText = async (req, res) => {
   const audioPath = req.file.path;
   
   try {
+    console.log('Starting speech-to-text conversion for file:', audioPath);
+    console.log('File size:', fs.statSync(audioPath).size, 'bytes');
+    
+    // Verify file exists and is not empty
+    if (!fs.existsSync(audioPath) || fs.statSync(audioPath).size === 0) {
+      throw new Error('Audio file is empty or does not exist');
+    }
+
     // Transcribe the audio using OpenAI Whisper API
     const result = await transcribeAudio(fs.createReadStream(audioPath));
     
     if (!result.success) {
+      console.error('Transcription failed:', result.error);
       throw new Error(result.error || 'Failed to transcribe audio');
     }
 
+    console.log('Transcription successful');
     res.json({ 
       success: true, 
       text: result.text 
     });
   } catch (error) {
-    console.error('Error in speech-to-text conversion:', error);
+    console.error('Error in speech-to-text conversion:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+      time: new Date().toISOString()
+    });
     
     res.status(500).json({ 
       success: false, 
-      error: error.message || 'Failed to process speech-to-text' 
+      error: 'Failed to process speech-to-text',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   } finally {
     // Always clean up the uploaded file

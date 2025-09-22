@@ -25,21 +25,51 @@ const openai = new OpenAI({
  */
 export const transcribeAudio = async (audioStream, model = 'whisper-1') => {
   try {
+    console.log('Sending audio to OpenAI Whisper API...');
+    
     const response = await openai.audio.transcriptions.create({
       file: audioStream,
       model: model,
       response_format: 'json',
     });
 
+    console.log('Received response from OpenAI Whisper API');
+    
+    if (!response || !response.text) {
+      console.error('Invalid response from OpenAI API:', response);
+      throw new Error('No transcription text in response');
+    }
+
     return {
       success: true,
       text: response.text,
     };
   } catch (error) {
-    console.error('OpenAI API Error:', error);
+    console.error('OpenAI API Error:', {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      type: error.type,
+      time: new Date().toISOString()
+    });
+    
+    let errorMessage = 'Failed to transcribe audio';
+    
+    if (error.status === 401) {
+      errorMessage = 'Invalid OpenAI API key';
+    } else if (error.status === 429) {
+      errorMessage = 'Rate limit exceeded for OpenAI API';
+    } else if (error.code === 'ENOTFOUND') {
+      errorMessage = 'Could not connect to OpenAI API - network error';
+    } else if (error.response) {
+      errorMessage = `OpenAI API error: ${error.response.status} - ${error.response.statusText}`;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
     return {
       success: false,
-      error: error.message || 'Failed to transcribe audio',
+      error: errorMessage,
     };
   }
 };
