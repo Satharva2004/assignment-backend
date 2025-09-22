@@ -22,18 +22,34 @@ export const convertSpeechToText = async (req, res) => {
   }
 
   const audioPath = req.file.path;
+  console.log('File uploaded to:', audioPath);
   
   try {
-    console.log('Starting speech-to-text conversion for file:', audioPath);
-    console.log('File size:', fs.statSync(audioPath).size, 'bytes');
-    
     // Verify file exists and is not empty
-    if (!fs.existsSync(audioPath) || fs.statSync(audioPath).size === 0) {
-      throw new Error('Audio file is empty or does not exist');
+    if (!fs.existsSync(audioPath)) {
+      throw new Error(`Audio file not found at path: ${audioPath}`);
+    }
+    
+    const stats = fs.statSync(audioPath);
+    console.log('File stats:', {
+      size: stats.size,
+      modified: stats.mtime,
+      isFile: stats.isFile()
+    });
+    
+    if (stats.size === 0) {
+      throw new Error('Uploaded audio file is empty');
     }
 
+    // Create read stream and handle any errors
+    const audioStream = fs.createReadStream(audioPath);
+    audioStream.on('error', (err) => {
+      console.error('Error reading audio file:', err);
+      throw new Error(`Error reading audio file: ${err.message}`);
+    });
+
     // Transcribe the audio using OpenAI Whisper API
-    const result = await transcribeAudio(fs.createReadStream(audioPath));
+    const result = await transcribeAudio(audioStream);
     
     if (!result.success) {
       console.error('Transcription failed:', result.error);
@@ -41,7 +57,7 @@ export const convertSpeechToText = async (req, res) => {
     }
 
     console.log('Transcription successful');
-    res.json({ 
+    return res.json({ 
       success: true, 
       text: result.text 
     });
@@ -51,10 +67,12 @@ export const convertSpeechToText = async (req, res) => {
       stack: error.stack,
       name: error.name,
       code: error.code,
-      time: new Date().toISOString()
+      time: new Date().toISOString(),
+      filePath: audioPath,
+      fileExists: fs.existsSync(audioPath)
     });
     
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       error: 'Failed to process speech-to-text',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -62,7 +80,12 @@ export const convertSpeechToText = async (req, res) => {
   } finally {
     // Always clean up the uploaded file
     if (audioPath && fs.existsSync(audioPath)) {
-      deleteFile(audioPath);
+      try {
+        fs.unlinkSync(audioPath);
+        console.log('Temporary file deleted:', audioPath);
+      } catch (err) {
+        console.error('Error deleting temporary file:', err);
+      }
     }
   }
 };
