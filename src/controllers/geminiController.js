@@ -37,10 +37,22 @@ export async function handleGenerate(req, res) {
       return res.status(400).json({ error: "Prompt is required in the request body" });
     }
 
-    const userId = req.user?.id || 'anonymous';
-    const { expert, systemPrompt, includeSearch } = options;
+    // Derive a stable user/session id to isolate chat history across users and tabs
+    const derivedSessionId =
+      req.user?.id ||
+      req.headers["x-session-id"] ||
+      req.body?.sessionId ||
+      req.ip ||
+      "anonymous";
+
+    const userId = String(derivedSessionId);
+
+    const { expert, systemPrompt, includeSearch, keepHistoryWithFiles } = options;
     // Attach uploads from Multer (field name: 'files')
     const uploads = Array.isArray(req.files) ? req.files : [];
+    // If client didn't specify includeSearch, default to false when files are provided
+    const effectiveIncludeSearch =
+      typeof includeSearch === 'boolean' ? includeSearch : (uploads.length === 0);
     
     console.log('Calling Gemini API with:', { 
       prompt, 
@@ -48,19 +60,23 @@ export async function handleGenerate(req, res) {
       options: {
         expert,
         systemPrompt: systemPrompt ? '***provided***' : 'not provided',
-        includeSearch: includeSearch !== false, // default to true if not specified
-        uploadsCount: uploads.length
+        includeSearch: effectiveIncludeSearch, // default false if files exist
+        uploadsCount: uploads.length,
+        keepHistoryWithFiles: !!keepHistoryWithFiles
       }
     });
     
     const result = await generateContent(
-      prompt, 
+      prompt,
       userId,
       {
         expert,
         systemPrompt,
-        includeSearch: includeSearch !== false,
-        uploads
+        includeSearch: effectiveIncludeSearch,
+        uploads,
+        // By default, when new files are attached, do NOT use prior chat history
+        // to avoid stale content from previous uploads. Opt-out via keepHistoryWithFiles=true
+        resetHistory: uploads.length > 0 && keepHistoryWithFiles !== true
       }
     );
     console.log('Received response from Gemini API');

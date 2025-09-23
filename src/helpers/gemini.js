@@ -25,7 +25,7 @@ const GEMINI_API_KEYS = [
 ].filter(Boolean);
 
 const MODEL_ID = "gemini-2.5-flash";
-const GENERATE_CONTENT_API = "streamGenerateContent";
+const GENERATE_CONTENT_API = "generateContent";
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
 // Configuration constants
@@ -34,7 +34,7 @@ const CONFIG = {
   MAX_OUTPUT_TOKENS: 8192, 
   MAX_USERS: 100,
   RETRY_DELAY: 1000, //1ms
-  REQUEST_TIMEOUT: 30000,
+  REQUEST_TIMEOUT: 60000,
 };
 
 // Retryable HTTP status codes
@@ -477,6 +477,12 @@ export async function generateContent(
     } else {
       console.warn(`Unknown expert type: ${expertType}. Using default research assistant prompt.`);
       console.log('Default prompt starts with:', EXPERT_PROMPTS.default.substring(0, 100) + '...');
+    }
+
+    // Reset history on demand (e.g., when new files are uploaded) to avoid stale context bleed
+    if (options.resetHistory) {
+      console.log(`Resetting chat history for userId=${userId} due to resetHistory option`);
+      chatHistory.clear(userId);
     }
 
     // Get user history and prepare messages
