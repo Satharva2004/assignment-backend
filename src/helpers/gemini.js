@@ -30,17 +30,16 @@ const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
 // Configuration constants
 const CONFIG = {
-  MAX_HISTORY_LENGTH: 10, // Increased for better context
-  MAX_OUTPUT_TOKENS: 8192, // Significantly increased output tokens
-  MAX_USERS: 100, // Prevent memory leaks
-  RETRY_DELAY: 1000, // 1 second delay between retries
-  REQUEST_TIMEOUT: 30000, // 30 second timeout
+  MAX_HISTORY_LENGTH: 10,
+  MAX_OUTPUT_TOKENS: 8192, 
+  MAX_USERS: 100,
+  RETRY_DELAY: 1000, //1ms
+  REQUEST_TIMEOUT: 30000,
 };
 
 // Retryable HTTP status codes
 const RETRYABLE_STATUS_CODES = new Set([429, 502, 503, 504]);
 
-// Enhanced chat history management with LRU-like behavior
 class ChatHistoryManager {
   constructor(maxUsers = CONFIG.MAX_USERS) {
     this.history = new Map();
@@ -72,7 +71,6 @@ class ChatHistoryManager {
   }
 }
 
-// API key rotation with backoff
 class APIKeyManager {
   constructor(keys) {
     this.keys = keys;
@@ -298,16 +296,147 @@ async function fetchWithTimeout(url, options, timeout = CONFIG.REQUEST_TIMEOUT) 
 const chatHistory = new ChatHistoryManager();
 const keyManager = new APIKeyManager(GEMINI_API_KEYS);
 
-/**
- * Generate content using Gemini API
- * @param {string} prompt - The user's input prompt
- * @param {string} userId - Unique identifier for the user's chat session
- * @param {Object} options - Additional options
- * @param {string} [options.expert='research'] - The expert type to use (research, real-estate, crypto, etc.)
- * @param {string} [options.systemPrompt] - Optional custom system prompt (overrides expert prompt if provided)
- * @param {boolean} [options.includeSearch=true] - Whether to include web search
- * @returns {Promise<Object>} - The generated content response
- */
+// Minimal upload helpers to extract text from supported files and images for inlineData
+// Try to parse PDF buffers using pdf-parse if available
+async function parsePdfBuffer(buf) {
+  try {
+    const mod = await import('pdf-parse');
+    const pdfParse = mod?.default || mod;
+    const result = await pdfParse(buf);
+    return result?.text || '';
+  } catch (e) {
+    console.warn('pdf-parse not available or failed to parse PDF:', e?.message || e);
+    return '';
+  }
+}
+
+// Try to parse DOCX using mammoth if available
+async function parseDocxBuffer(buf) {
+  try {
+    const mod = await import('mammoth');
+    const mammoth = mod?.default || mod;
+    const result = await mammoth.extractRawText({ buffer: Buffer.from(buf) });
+    return result?.value || '';
+  } catch (e) {
+    console.warn('mammoth not available or failed to parse DOCX:', e?.message || e);
+    return '';
+  }
+}
+
+// Try to parse spreadsheets (xls/xlsx) using xlsx if available
+async function parseSpreadsheetBuffer(buf) {
+  try {
+    const mod = await import('xlsx');
+    const XLSX = mod?.default || mod;
+    const wb = XLSX.read(buf, { type: 'buffer' });
+    const sheetNames = wb.SheetNames || [];
+    let out = '';
+    for (const name of sheetNames) {
+      const ws = wb.Sheets[name];
+      if (!ws) continue;
+      const csv = XLSX.utils.sheet_to_csv(ws);
+      if (csv && csv.trim()) {
+        out += `--- Sheet: ${name} ---\n${csv}\n`;
+      }
+    }
+    return out.trim();
+  } catch (e) {
+    console.warn('xlsx not available or failed to parse spreadsheet:', e?.message || e);
+    return '';
+  }
+}
+
+export async function extractTextFromUploads(files = []) {
+  if (!Array.isArray(files) || files.length === 0) return '';
+  const parts = [];
+  const MAX_TOTAL_CHARS = 50000; // safety cap to avoid overly long prompts
+  let total = 0;
+  for (const f of files) {
+    try {
+      const name = f.originalname || 'file';
+      const mime = f.mimetype || '';
+      const buf = f.buffer;
+      if (!buf || !Buffer.isBuffer(buf)) continue;
+
+      let text = '';
+      if (mime === 'application/pdf') {
+        text = await parsePdfBuffer(buf);
+      } else if (mime.startsWith('text/')) {
+        text = Buffer.from(buf).toString('utf8');
+      } else if (mime === 'text/markdown') {
+        text = Buffer.from(buf).toString('utf8');
+      } else if (mime === 'text/html') {
+        text = Buffer.from(buf).toString('utf8');
+      } else if (mime === 'application/json') {
+        text = Buffer.from(buf).toString('utf8');
+      } else if (mime === 'application/rtf') {
+        text = Buffer.from(buf).toString('utf8');
+      } else if (mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') { // .docx
+        text = await parseDocxBuffer(buf);
+      } else if (mime === 'application/msword') { // .doc legacy
+        console.warn('Legacy .doc files are not supported for text extraction. Consider converting to .docx');
+        text = '';
+      } else if (mime === 'text/csv') {
+        text = Buffer.from(buf).toString('utf8');
+      } else if (mime === 'application/vnd.ms-excel' || mime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') { // .xls/.xlsx
+        text = await parseSpreadsheetBuffer(buf);
+      } else if (mime === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' || mime === 'application/vnd.ms-powerpoint') { // .pptx/.ppt
+        console.warn('PowerPoint files are accepted but text extraction is not implemented.');
+        text = '';
+      } else {
+        // Not implementing heavy parsers here; gracefully skip unsupported
+        // Fallback by basic extension check for .pdf
+        const lower = (name || '').toLowerCase();
+        if (!text && lower.endsWith('.pdf')) {
+          text = await parsePdfBuffer(buf);
+        } else if (lower.endsWith('.docx')) {
+          text = await parseDocxBuffer(buf);
+        } else if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) {
+          text = await parseSpreadsheetBuffer(buf);
+        } else {
+          text = '';
+        }
+      }
+
+      if (text) {
+        // Truncate incrementally to the cap
+        const remaining = Math.max(0, MAX_TOTAL_CHARS - total);
+        const snippet = text.length > remaining ? text.slice(0, remaining) : text;
+        if (snippet.length > 0) {
+          parts.push(`--- Uploaded: ${name} ---\n\n${snippet}\n\n`);
+          total += snippet.length;
+        }
+        if (total >= MAX_TOTAL_CHARS) {
+          console.warn('Total extracted text truncated to MAX_TOTAL_CHARS');
+          break;
+        }
+      }
+    } catch (e) {
+      // ignore single file errors
+    }
+  }
+  return parts.join('');
+}
+
+export async function extractImagesFromUploads(files = []) {
+  if (!Array.isArray(files) || files.length === 0) return [];
+  const images = [];
+  for (const f of files) {
+    try {
+      const mime = f?.mimetype || '';
+      if (!mime.startsWith('image/')) continue;
+      const name = f.originalname || 'image';
+      const buf = f.buffer;
+      if (!buf || !Buffer.isBuffer(buf)) continue;
+      const data = Buffer.from(buf).toString('base64');
+      images.push({ name, mimeType: mime, data });
+    } catch (_) {
+      /* ignore single file errors */
+    }
+  }
+  return images;
+}
+
 /**
  * Generate content using Gemini API
  * @param {string} prompt - The user's input prompt
@@ -316,6 +445,7 @@ const keyManager = new APIKeyManager(GEMINI_API_KEYS);
  * @param {string} [options.expert='research'] - The expert type to use
  * @param {string} [options.systemPrompt] - Custom system prompt (overrides expert prompt)
  * @param {boolean} [options.includeSearch=true] - Whether to include web search
+ * @param {Array} [options.uploads] - Array of uploaded files
  * @returns {Promise<Object>} The generated content response
  */
 export async function generateContent(
@@ -324,16 +454,8 @@ export async function generateContent(
   options = {}
 ) {
   console.log('generateContent called with:', { prompt, userId, options });
-  // Validate API keys
-  if (!GEMINI_API_KEYS?.length) {
-    return {
-      content: 'Error: No Gemini API keys configured. Please set at least one GEMINI_API_KEY in your .env file.',
-      sources: [],
-      timestamp: new Date().toISOString(),
-      error: 'MISSING_API_KEYS'
-    };
-  }
 
+  
   const startTime = Date.now();
   
   try {
@@ -359,9 +481,37 @@ export async function generateContent(
 
     // Get user history and prepare messages
     const userHistory = chatHistory.get(userId);
+
+    // Incorporate uploaded text and images if provided
+    const uploadedText = await extractTextFromUploads(options.uploads);
+    const uploadedImages = await extractImagesFromUploads(options.uploads);
+    if (options.uploads && options.uploads.length) {
+      console.log('Uploads provided to generateContent:', {
+        total: options.uploads.length,
+        textChars: uploadedText ? uploadedText.length : 0,
+        imagesCount: uploadedImages.length
+      });
+    }
+
+    let composedPrompt = prompt || '';
+    if (uploadedText) {
+      composedPrompt += `\n\n--- Uploaded Files Text ---\n${uploadedText}`;
+    }
+
+    const parts = [{ text: composedPrompt }];
+    // Each uploaded image should be an object: { name?, mimeType, data(base64) }
+    for (const img of uploadedImages) {
+      if (img && img.data && img.mimeType) {
+        parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
+      }
+    }
+    if (uploadedImages.length) {
+      console.log(`Attached ${uploadedImages.length} image(s) to the user message as inlineData.`);
+    }
+
     const userMessage = {
       role: 'user',
-      parts: [{ text: prompt }]
+      parts
     };
 
     let messages = [...userHistory, userMessage];
