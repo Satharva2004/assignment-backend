@@ -6,6 +6,10 @@ import { CRYPTO_EXPERT_PROMPT } from "../prompts/cryptoexpert.js";
 import { PORTFOLIO_EXPERT_PROMPT as INVESTMENT_EXPERT_PROMPT } from "../prompts/investmentexpert.js";
 import { STOCK_EXPERT_PROMPT } from "../prompts/stockexpert.js";
 import { RETIREMENT_TAX_EXPERT_PROMPT } from "../prompts/retierment_tax_expert.js";
+import { TRANSLATION_EXPERT_PROMPT } from "../prompts/Anuvad.js";
+import { SUMMARIZATION_EXPERT_PROMPT } from "../prompts/Saaransh.js";
+import { QUIZ_EXPERT_PROMPT } from "../prompts/Pariksha.js";
+
 import env from "../config/env.js";
 
 // Map of expert types to their corresponding prompts
@@ -16,7 +20,10 @@ const EXPERT_PROMPTS = {
   'investment': INVESTMENT_EXPERT_PROMPT,
   'stock': STOCK_EXPERT_PROMPT,
   'retirement-tax': RETIREMENT_TAX_EXPERT_PROMPT,
-  'default': RESEARCH_ASSISTANT_PROMPT
+  'default': RESEARCH_ASSISTANT_PROMPT,
+  'anuvad': TRANSLATION_EXPERT_PROMPT,
+  'saaransh': SUMMARIZATION_EXPERT_PROMPT,
+  'pariksha': QUIZ_EXPERT_PROMPT
 };
 
 const GEMINI_API_KEYS = [

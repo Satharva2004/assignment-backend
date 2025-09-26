@@ -62,7 +62,8 @@ const allowedOrigins = [
   'http://localhost:3000', // Development
   'https://assignment-backend-one-khaki.vercel.app', // Production Backend
   'https://deepsearch-assignment.vercel.app', // Production Frontend
-  'https://finance-u.vercel.app' //FinanceU
+  'https://finance-u.vercel.app', //FinanceU
+  'http://localhost:8080' // Localhost
 ];
 
 // Enable CORS for all routes
