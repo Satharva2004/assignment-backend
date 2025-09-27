@@ -7,11 +7,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const createUploadsDir = () => {
-  // In production, use the system's temp directory
-  // In development, use a local uploads directory
-  const baseDir = process.env.NODE_ENV === 'production' 
-    ? os.tmpdir() 
-    : path.join(__dirname, '../../uploads');
+  // Prefer OS temp directory everywhere except explicit local development.
+  // Serverless platforms (e.g., Vercel/AWS Lambda) mount code under /var/task (read-only).
+  // Writing under that tree will cause ENOENT or EROFS errors. Using os.tmpdir() is safe.
+  const isDev = process.env.NODE_ENV === 'development';
+  const baseDir = isDev
+    ? path.join(__dirname, '../../uploads')
+    : os.tmpdir();
   
   const uploadsDir = path.join(baseDir, 'eduvance-uploads');
   
@@ -19,7 +21,7 @@ export const createUploadsDir = () => {
     // Create uploads directory if it doesn't exist
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true, mode: 0o755 });
-      console.log('Created uploads directory at:', uploadsDir);
+      console.log('[fileUpload] Created uploads directory at:', uploadsDir);
     }
     
     // Verify directory is writable
@@ -27,8 +29,8 @@ export const createUploadsDir = () => {
     
     return uploadsDir;
   } catch (error) {
-    console.error('Error setting up uploads directory:', error.message);
-    console.warn('Falling back to system temp directory');
+    console.error('[fileUpload] Error setting up uploads directory:', error.message);
+    console.warn('[fileUpload] Falling back to system temp directory');
     return os.tmpdir();
   }
 };
