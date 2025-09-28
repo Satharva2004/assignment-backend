@@ -1,4 +1,6 @@
-import { generateContent } from "../helpers/gemini.js";
+import fetch from "node-fetch";
+import env from "../config/env.js";
+import { generateContent, buildRequestBody, MODEL_ID, BASE_URL } from "../helpers/gemini.js";
 
 export async function handleGenerate(req, res) {
   try {
@@ -91,3 +93,100 @@ export async function handleGenerate(req, res) {
   }
 }
 //cry
+
+// Stream tokens ASAP via SSE using Gemini's streamGenerateContent
+export async function handleStreamGenerate(req, res) {
+  try {
+    const { prompt, options = {} } = req.body || {};
+    if (!prompt) {
+      return res.status(400).json({ error: "Prompt is required" });
+    }
+
+    const messages = [
+      { role: "user", parts: [{ text: String(prompt) }] }
+    ];
+
+    const includeSearch = options.includeSearch !== false; // default true
+    const systemPrompt = options.systemPrompt || undefined;
+
+    const body = buildRequestBody(messages, systemPrompt, includeSearch);
+
+    const url = `${BASE_URL}/${MODEL_ID}:streamGenerateContent?alt=sse&key=${env.GEMINI_API_KEY}`;
+
+    // Prepare SSE response
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
+
+    const upstream = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream"
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!upstream.ok || !upstream.body) {
+      const txt = await upstream.text().catch(() => "");
+      res.write(`event: error\n`);
+      res.write(`data: ${JSON.stringify({ status: upstream.status, error: txt || upstream.statusText })}\n\n`);
+      return res.end();
+    }
+
+    // Transform upstream SSE into simplified {text: "..."} events
+    upstream.body.on("data", (chunk) => {
+      const str = chunk.toString();
+      console.log('Received chunk from Gemini:', str);
+      const blocks = str.split('\n\n');
+      for (const block of blocks) {
+        const dataLine = block.split('\n').find(l => l.startsWith('data: '));
+        if (!dataLine) continue;
+        const payload = dataLine.slice(6);
+        if (!payload || payload === '[DONE]') continue;
+        try {
+          const obj = JSON.parse(payload);
+          const cand = obj?.candidates?.[0];
+          const parts = cand?.content?.parts;
+          if (Array.isArray(parts)) {
+            for (const p of parts) {
+              if (typeof p?.text === 'string' && p.text.length) {
+                res.write(`event: message\n`);
+                res.write(`data: ${JSON.stringify({ text: p.text })}\n\n`);
+              }
+            }
+          }
+          if (cand?.finishReason) {
+            res.write(`event: finish\n`);
+            res.write(`data: ${JSON.stringify({ finishReason: cand.finishReason })}\n\n`);
+          }
+        } catch (e) {
+          // If we can't parse, skip silently
+        }
+      }
+    });
+    upstream.body.on("end", () => {
+      console.log('Gemini stream ended');
+      res.end();
+    });
+    upstream.body.on("error", (err) => {
+      console.error('Gemini stream error:', err);
+      try {
+        res.write(`event: error\n`);
+        res.write(`data: ${JSON.stringify({ message: err?.message || "stream error" })}\n\n`);
+      } finally {
+        res.end();
+      }
+    });
+  } catch (error) {
+    // Ensure we don't hang the stream on unexpected errors
+    try {
+      res.setHeader("Content-Type", "text/event-stream");
+      res.write(`event: error\n`);
+      res.write(`data: ${JSON.stringify({ message: error.message })}\n\n`);
+    } finally {
+      res.end();
+    }
+  }
+}

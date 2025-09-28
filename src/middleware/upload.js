@@ -45,7 +45,6 @@ const DOC_MIME_TYPES = [
 
 const ALLOWED_MIME_TYPES = new Set([...IMAGE_MIME_TYPES, ...DOC_MIME_TYPES]);
 
-// Memory storage so we can access file buffers directly (useful for AI parsing)
 const storage = multer.memoryStorage();
 
 function fileFilter(req, file, cb) {

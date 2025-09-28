@@ -31,9 +31,9 @@ const GEMINI_API_KEYS = [
   env.GEMINI_API_KEY2 
 ].filter(Boolean);
 
-const MODEL_ID = "gemini-2.5-flash";
-const GENERATE_CONTENT_API = "generateContent";
-const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
+export const MODEL_ID = "gemini-2.5-flash";
+export const GENERATE_CONTENT_API = "generateContent";
+export const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
 // Configuration constants
 const CONFIG = {
@@ -42,10 +42,15 @@ const CONFIG = {
   MAX_USERS: 100,
   RETRY_DELAY: 1000, //1ms
   REQUEST_TIMEOUT: 60000,
+  TITLE_FETCH_TIMEOUT: 5000, // 5 seconds for title fetching
+  MAX_TITLE_LENGTH: 100, // Maximum title length
 };
 
 // Retryable HTTP status codes
 const RETRYABLE_STATUS_CODES = new Set([429, 502, 503, 504]);
+
+// Cache for page titles to avoid repeated requests
+const titleCache = new Map();
 
 class ChatHistoryManager {
   constructor(maxUsers = CONFIG.MAX_USERS) {
@@ -124,8 +129,146 @@ class APIKeyManager {
   }
 }
 
+/**
+ * Fetch page title from URL
+ * @param {string} url - The URL to fetch title from
+ * @returns {Promise<string>} - The page title or fallback
+ */
+async function fetchPageTitle(url) {
+  // Check cache first
+  if (titleCache.has(url)) {
+    return titleCache.get(url);
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), CONFIG.TITLE_FETCH_TIMEOUT);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      },
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const html = await response.text();
+    
+    // Extract title using regex (simple but effective for most cases)
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    let title = titleMatch ? titleMatch[1].trim() : '';
+    
+    // Clean up title
+    if (title) {
+      title = title
+        .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+        .replace(/[\r\n\t]/g, ' ') // Replace newlines and tabs with spaces
+        .trim();
+      
+      // Truncate if too long
+      if (title.length > CONFIG.MAX_TITLE_LENGTH) {
+        title = title.substring(0, CONFIG.MAX_TITLE_LENGTH - 3) + '...';
+      }
+    }
+
+    // Fallback to domain name if no title found
+    if (!title) {
+      try {
+        const urlObj = new URL(url);
+        title = urlObj.hostname.replace(/^www\./, '');
+      } catch (e) {
+        title = 'Untitled';
+      }
+    }
+
+    // Cache the result
+    titleCache.set(url, title);
+    
+    return title;
+  } catch (error) {
+    console.warn(`Failed to fetch title for ${url}:`, error.message);
+    
+    // Fallback to domain name
+    try {
+      const urlObj = new URL(url);
+      const fallback = urlObj.hostname.replace(/^www\./, '');
+      titleCache.set(url, fallback);
+      return fallback;
+    } catch (e) {
+      const fallback = 'Link';
+      titleCache.set(url, fallback);
+      return fallback;
+    }
+  }
+}
+
+/**
+ * Process sources to include titles
+ * @param {Set<string>} sources - Set of URLs
+ * @returns {Promise<Array>} - Array of source objects with titles
+ */
+async function processSourcesWithTitles(sources) {
+  if (!sources || sources.size === 0) return [];
+
+  const sourceArray = Array.from(sources);
+  const processedSources = [];
+
+  // Process sources concurrently but limit to avoid overwhelming servers
+  const BATCH_SIZE = 3;
+  for (let i = 0; i < sourceArray.length; i += BATCH_SIZE) {
+    const batch = sourceArray.slice(i, i + BATCH_SIZE);
+    const batchPromises = batch.map(async (url) => {
+      const title = await fetchPageTitle(url);
+      return { url, title };
+    });
+
+    try {
+      const batchResults = await Promise.allSettled(batchPromises);
+      batchResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          processedSources.push(result.value);
+        } else {
+          // Fallback if promise rejected
+          const url = batch[index];
+          try {
+            const urlObj = new URL(url);
+            processedSources.push({ 
+              url, 
+              title: urlObj.hostname.replace(/^www\./, '') 
+            });
+          } catch (e) {
+            processedSources.push({ url, title: 'Link' });
+          }
+        }
+      });
+    } catch (error) {
+      console.warn('Error processing source batch:', error);
+      // Add remaining URLs with fallback titles
+      batch.forEach(url => {
+        try {
+          const urlObj = new URL(url);
+          processedSources.push({ 
+            url, 
+            title: urlObj.hostname.replace(/^www\./, '') 
+          });
+        } catch (e) {
+          processedSources.push({ url, title: 'Link' });
+        }
+      });
+    }
+  }
+
+  return processedSources;
+}
+
 // Enhanced response processor that handles both streaming and non-streaming responses
-function processGeminiResponse(response) {
+async function processGeminiResponse(response) {
   const result = { content: '', sources: new Set() };
 
   try {
@@ -195,35 +338,60 @@ function processGeminiResponse(response) {
       return { content: result.content, sources: [] };
     }
 
-    // Clean content if we have any
+    // If we have content, extract URLs (markdown links and plain URLs) into sources
     if (result.content && result.content.length > 0) {
+      try {
+        const text = result.content;
+        // Extract markdown links: [title](url)
+        const mdLinkRe = /\[[^\]]+\]\((https?:\/\/[^\s)]+)\)/g;
+        let m;
+        while ((m = mdLinkRe.exec(text)) !== null) {
+          if (m[1]) result.sources.add(m[1]);
+        }
+        // Extract plain URLs
+        const urlRe = /(https?:\/\/[^\s)]+)(?![^\(]*\))/g;
+        let u;
+        while ((u = urlRe.exec(text)) !== null) {
+          if (u[1]) result.sources.add(u[1]);
+        }
+      } catch (e) {
+        console.warn('URL extraction from content failed:', e?.message || e);
+      }
+
+      // Light cleanup while preserving markdown links so users can click them
       const originalLength = result.content.length;
       result.content = result.content
-        .replace(/\*\*\*.*?\*\*\*/g, '') // Remove markdown bold
-        .replace(/\[.*?\]\(.*?\)/g, '')  // Remove markdown links
-        .replace(/\n{3,}/g, '\n\n')       // Remove extra newlines
+        .replace(/\*\*\*.*?\*\*\*/g, '') // Remove triple-asterisk bold artifacts if any
+        .replace(/\n{3,}/g, '\n\n')       // Remove excessive newlines
         .trim();
-      console.log(`Content cleaned: ${originalLength} -> ${result.content.length} chars`);
+      console.log(`Content cleaned (links preserved): ${originalLength} -> ${result.content.length} chars`);
     }
+
+    // Process sources with titles
+    const processedSources = await processSourcesWithTitles(result.sources);
 
     console.log('Final processing result:', { 
       contentLength: result.content?.length || 0, 
-      sourcesCount: result.sources.size || 0,
+      sourcesCount: processedSources.length,
       hasValidContent,
       lastFinishReason
     });
 
+    return {
+      content: result.content,
+      sources: processedSources
+    };
+
   } catch (error) {
     console.error('Error processing Gemini response:', error);
-    result.content = `Error processing response: ${error.message}`;
+    return {
+      content: `Error processing response: ${error.message}`,
+      sources: []
+    };
   }
-  return {
-    content: result.content,
-    sources: Array.from(result.sources)
-  };
 }
 
-function buildRequestBody(messages, systemPrompt = null, includeSearch = true) {
+export function buildRequestBody(messages, systemPrompt = null, includeSearch = true) {
   const body = {
     contents: messages,
     generationConfig: {
@@ -592,7 +760,7 @@ export async function generateContent(
         }
         
         // Process successful response
-        const result = processGeminiResponse(data);
+        const result = await processGeminiResponse(data);
         
         // Check if we got empty content and handle it
         if (!result.content || result.content.trim().length === 0) {
@@ -695,5 +863,18 @@ export function getAPIKeyStatus() {
     currentKeyIndex: keyManager.currentIndex,
     failedKeys: Array.from(keyManager.failedKeys),
     availableKeys: GEMINI_API_KEYS.length - keyManager.failedKeys.size
+  };
+}
+
+// Utility function to clear title cache (useful for testing or memory management)
+export function clearTitleCache() {
+  titleCache.clear();
+}
+
+// Utility function to get cache stats
+export function getTitleCacheStats() {
+  return {
+    size: titleCache.size,
+    entries: Array.from(titleCache.entries())
   };
 }
