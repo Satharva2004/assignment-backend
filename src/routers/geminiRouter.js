@@ -4,6 +4,7 @@ import { handleGenerate } from "../controllers/geminiController.js";
 import { uploadArray } from "../middleware/upload.js";
 import { authenticate, requireAuth } from "../middleware/auth.js";
 import { handleChatGenerate, handleChatStreamGenerate, getConversations, getConversationHistory, deleteConversation } from "../controllers/chatController.js";
+import { handleChartsGenerate, handleChatWithChartsParallel } from "../controllers/chartsController.js";
 
 const router = express.Router();
 
@@ -16,5 +17,11 @@ router.post("/chat/stream", authenticate, requireAuth, uploadArray, handleChatSt
 router.get("/conversations", authenticate, requireAuth, getConversations);
 router.get("/conversations/:conversationId", authenticate, requireAuth, getConversationHistory);
 router.delete("/conversations/:conversationId", authenticate, requireAuth, deleteConversation);
+
+// Charts-only generation (non-stream). Returns Chart.js JSON.
+router.post("/charts", authenticate, requireAuth, uploadArray, handleChartsGenerate);
+
+// Parallel: run chat and charts simultaneously and return combined payload
+router.post("/chat-with-charts", authenticate, requireAuth, uploadArray, handleChatWithChartsParallel);
 
 export default router;
