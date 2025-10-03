@@ -1,0 +1,631 @@
+{
+	"info": {
+		"_postman_id": "b042ab53-b19c-4336-9862-208e4d5d82bf",
+		"name": "QuickChart Examples",
+		"description": "This collection includes examples of how to use the QuickChart API to generate chart images.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "36966469",
+		"_collection_link": "https://www.postman.com/speeding-flare-926667/quickchart-public-workspace/collection/jpef9ga/quickchart-examples?action=share&source=collection_link&creator=36966469"
+	},
+	"item": [
+		{
+			"name": "Short URLs",
+			"item": [
+				{
+					"name": "Create Short URL",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"backgroundColor\": \"#fff\",\n  \"width\": 500,\n  \"height\": 300,\n  \"devicePixelRatio\": 1.0,\n  \"chart\": {\n    \"type\": \"bar\",\n    \"data\": {\n      \"labels\": [2012, 2013, 2014, 2015, 2016],\n      \"datasets\": [\n        {\n          \"label\": \"Users\",\n          \"data\": [120, 60, 50, 180, 120]\n        }\n      ]\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "https://quickchart.io/chart/create",
+							"protocol": "https",
+							"host": [
+								"quickchart",
+								"io"
+							],
+							"path": [
+								"chart",
+								"create"
+							]
+						},
+						"description": "Generate a short URL that refers to this chart."
+					},
+					"response": [
+						{
+							"name": "Create Short URL",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"backgroundColor\": \"#fff\",\n  \"width\": 500,\n  \"height\": 300,\n  \"devicePixelRatio\": 1.0,\n  \"chart\": {\n    \"type\": \"bar\",\n    \"data\": {\n      \"labels\": [2012, 2013, 2014, 2015, 2016],\n      \"datasets\": [\n        {\n          \"label\": \"Users\",\n          \"data\": [120, 60, 50, 180, 120]\n        }\n      ]\n    }\n  }\n}"
+								},
+								"url": {
+									"raw": "https://quickchart.io/chart/create",
+									"protocol": "https",
+									"host": [
+										"quickchart",
+										"io"
+									],
+									"path": [
+										"chart",
+										"create"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Date",
+									"value": "Fri, 30 Sep 2022 15:41:40 GMT"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								},
+								{
+									"key": "Transfer-Encoding",
+									"value": "chunked"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Report-To",
+									"value": "{\"endpoints\":[{\"url\":\"https:\\/\\/a.nel.cloudflare.com\\/report\\/v3?s=ZJ1HosRTF9QSOAVFwzuP5hcdOl6r1fNVSQpm9Bf1RHF%2BPGBJjF7O2hHCfRHradB980CG7m3aioLXQt8vPvSGMrJmPVrmlZocGAbtX3u%2F7evDciEO8oslKB%2F9eXYjbG0%3D\"}],\"group\":\"cf-nel\",\"max_age\":604800}"
+								},
+								{
+									"key": "NEL",
+									"value": "{\"success_fraction\":0,\"report_to\":\"cf-nel\",\"max_age\":604800}"
+								},
+								{
+									"key": "Vary",
+									"value": "Accept-Encoding"
+								},
+								{
+									"key": "Server",
+									"value": "cloudflare"
+								},
+								{
+									"key": "CF-RAY",
+									"value": "752e10676d3d81c3-IAD"
+								},
+								{
+									"key": "Content-Encoding",
+									"value": "br"
+								},
+								{
+									"key": "alt-svc",
+									"value": "h3=\":443\"; ma=86400, h3-29=\":443\"; ma=86400"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": true,\n    \"url\": \"https://quickchart.io/chart/render/sf-2a588ba8-ec63-40e5-8ba3-eb06bc310e1d\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Chart with function ShortURL (POST)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"version\": \"3\",\n  \"backgroundColor\": \"#fff\",\n  \"width\": 500,\n  \"height\": 300,\n  \"devicePixelRatio\": 1.0,\n  \"chart\": \"{type:'bar',data:{labels:['January','February','March','April','May'],datasets:[{label:'Dogs',data:[50,60,70,180,190]}]},options:{scales:{yAxes:[{ticks:{callback:function(value){return'$'+value;}}}]}}}\"\n}\n"
+						},
+						"url": {
+							"raw": "https://quickchart.io/chart/create",
+							"protocol": "https",
+							"host": [
+								"quickchart",
+								"io"
+							],
+							"path": [
+								"chart",
+								"create"
+							]
+						},
+						"description": "Generate a more complex chart.  In this case, we add a \"k\" suffix to the Y-axis values."
+					},
+					"response": [
+						{
+							"name": "Chart with function ShortURL (POST)",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"version\": \"3\",\n  \"backgroundColor\": \"#fff\",\n  \"width\": 500,\n  \"height\": 300,\n  \"devicePixelRatio\": 1.0,\n  \"chart\": \"{type:'bar',data:{labels:['January','February','March','April','May'],datasets:[{label:'Dogs',data:[50,60,70,180,190]}]},options:{scales:{yAxes:[{ticks:{callback:function(value){return'$'+value;}}}]}}}\"\n}\n"
+								},
+								"url": {
+									"raw": "https://quickchart.io/chart/create",
+									"protocol": "https",
+									"host": [
+										"quickchart",
+										"io"
+									],
+									"path": [
+										"chart",
+										"create"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Date",
+									"value": "Fri, 30 Sep 2022 15:40:20 GMT"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								},
+								{
+									"key": "Transfer-Encoding",
+									"value": "chunked"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Report-To",
+									"value": "{\"endpoints\":[{\"url\":\"https:\\/\\/a.nel.cloudflare.com\\/report\\/v3?s=6KhDz7J%2Bi9iVtuVhVryv5h9bvYjVIvYzgS%2F9jep%2F%2Bq8JgXhYZluwnh3KtLdXiABfRy3s094DGaeCQKmA45g4E3mztZkwudihTeKootdb6UcxB3Y2agMoI1Q%2BoqazQKw%3D\"}],\"group\":\"cf-nel\",\"max_age\":604800}"
+								},
+								{
+									"key": "NEL",
+									"value": "{\"success_fraction\":0,\"report_to\":\"cf-nel\",\"max_age\":604800}"
+								},
+								{
+									"key": "Vary",
+									"value": "Accept-Encoding"
+								},
+								{
+									"key": "Server",
+									"value": "cloudflare"
+								},
+								{
+									"key": "CF-RAY",
+									"value": "752e0e6e3ce981ac-IAD"
+								},
+								{
+									"key": "Content-Encoding",
+									"value": "br"
+								},
+								{
+									"key": "alt-svc",
+									"value": "h3=\":443\"; ma=86400, h3-29=\":443\"; ma=86400"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": true,\n    \"url\": \"https://quickchart.io/chart/render/sf-8505bed8-f2e1-410d-b3c3-b6b9da308106\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Candlestick chart ShortURL (POST)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"version\": \"3\",\n  \"backgroundColor\": \"#fff\",\n  \"width\": 500,\n  \"height\": 300,\n  \"devicePixelRatio\": 1.0,\n  \"chart\": \"{  type: 'candlestick',  data: {    datasets: [      {        data: [          { x: new Date('2022-08-01T17:00:00-04:00').getTime(), o: 18.23, h: 19.36, l: 18.18, c: 19.31 },          { x: new Date('2022-08-02T17:00:00-04:00').getTime(), o: 19.5, h: 19.89, l: 19.0, c: 19.29 },          { x: new Date('2022-08-03T17:00:00-04:00').getTime(), o: 19.13, h: 19.15, l: 18.43, c: 18.75 },          { x: new Date('2022-08-04T17:00:00-04:00').getTime(), o: 18.54, h: 18.76, l: 18.27, c: 18.76 },          { x: new Date('2022-08-05T17:00:00-04:00').getTime(), o: 18.76, h: 19.14, l: 18.63, c: 18.7 },        ],      },    ],  },  options: {    scales:{      x:{        adapters: {          date: {            zone: 'UTC-4'          }        },        time: {          unit: 'day',          stepSize: 1,          displayFormats: {            day: 'MMM d',            month: 'MMM d',          }        },        ticks: {          autoSkip: false,        },      }    },    plugins: {      legend: {        display: false,      },    },  },}\"\n}\n"
+						},
+						"url": {
+							"raw": "https://quickchart.io/chart/create",
+							"protocol": "https",
+							"host": [
+								"quickchart",
+								"io"
+							],
+							"path": [
+								"chart",
+								"create"
+							]
+						},
+						"description": "Generate a more complex chart.  In this case, we add a \"k\" suffix to the Y-axis values."
+					},
+					"response": [
+						{
+							"name": "Candlestick chart (POST)",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"version\": \"3\",\n  \"backgroundColor\": \"#fff\",\n  \"width\": 500,\n  \"height\": 300,\n  \"devicePixelRatio\": 1.0,\n  \"chart\": \"{  type: 'candlestick',  data: {    datasets: [      {        data: [          { x: new Date('2022-08-01T17:00:00-04:00').getTime(), o: 18.23, h: 19.36, l: 18.18, c: 19.31 },          { x: new Date('2022-08-02T17:00:00-04:00').getTime(), o: 19.5, h: 19.89, l: 19.0, c: 19.29 },          { x: new Date('2022-08-03T17:00:00-04:00').getTime(), o: 19.13, h: 19.15, l: 18.43, c: 18.75 },          { x: new Date('2022-08-04T17:00:00-04:00').getTime(), o: 18.54, h: 18.76, l: 18.27, c: 18.76 },          { x: new Date('2022-08-05T17:00:00-04:00').getTime(), o: 18.76, h: 19.14, l: 18.63, c: 18.7 },        ],      },    ],  },  options: {    scales:{      x:{        adapters: {          date: {            zone: 'UTC-4'          }        },        time: {          unit: 'day',          stepSize: 1,          displayFormats: {            day: 'MMM d',            month: 'MMM d',          }        },        ticks: {          autoSkip: false,        },      }    },    plugins: {      legend: {        display: false,      },    },  },}\"\n}\n"
+								},
+								"url": {
+									"raw": "https://quickchart.io/chart/create",
+									"protocol": "https",
+									"host": [
+										"quickchart",
+										"io"
+									],
+									"path": [
+										"chart",
+										"create"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Date",
+									"value": "Fri, 30 Sep 2022 15:29:50 GMT"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								},
+								{
+									"key": "Transfer-Encoding",
+									"value": "chunked"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "*"
+								},
+								{
+									"key": "Report-To",
+									"value": "{\"endpoints\":[{\"url\":\"https:\\/\\/a.nel.cloudflare.com\\/report\\/v3?s=8%2BK46GfkgZqGkIFRrmQBkLTtvCZfkeknx6S0X4l9ldsxdfULHhl4WqBmZVgaVg4lWZ1MTNz8%2BdgMWMIAsG9PcDKFcqfDaBIBSigKVEfm94XnlnKBr9ZtThfM%2FPPyy%2Fc%3D\"}],\"group\":\"cf-nel\",\"max_age\":604800}"
+								},
+								{
+									"key": "NEL",
+									"value": "{\"success_fraction\":0,\"report_to\":\"cf-nel\",\"max_age\":604800}"
+								},
+								{
+									"key": "Vary",
+									"value": "Accept-Encoding"
+								},
+								{
+									"key": "Server",
+									"value": "cloudflare"
+								},
+								{
+									"key": "CF-RAY",
+									"value": "752dff0ccbe69c30-IAD"
+								},
+								{
+									"key": "Content-Encoding",
+									"value": "br"
+								},
+								{
+									"key": "alt-svc",
+									"value": "h3=\":443\"; ma=86400, h3-29=\":443\"; ma=86400"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"success\": true,\n    \"url\": \"https://quickchart.io/chart/render/sf-400b2aca-0f52-4331-904e-ffaab9c89465\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Simple chart",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://quickchart.io/chart?chart={\n  type: 'bar',\n  data: {\n    labels: ['Q1', 'Q2', 'Q3', 'Q4'],\n    datasets: [{\n      label: 'Revenue',\n      data: [100, 200, 300, 400]\n    }]\n  }\n}&backgroundColor=white&width=500&height=300&devicePixelRatio=1.0&format=png&version=2.9.3",
+					"protocol": "https",
+					"host": [
+						"quickchart",
+						"io"
+					],
+					"path": [
+						"chart"
+					],
+					"query": [
+						{
+							"key": "chart",
+							"value": "{\n  type: 'bar',\n  data: {\n    labels: ['Q1', 'Q2', 'Q3', 'Q4'],\n    datasets: [{\n      label: 'Revenue',\n      data: [100, 200, 300, 400]\n    }]\n  }\n}",
+							"description": "The Chart.js definition for this bar chart"
+						},
+						{
+							"key": "backgroundColor",
+							"value": "white"
+						},
+						{
+							"key": "width",
+							"value": "500"
+						},
+						{
+							"key": "height",
+							"value": "300"
+						},
+						{
+							"key": "devicePixelRatio",
+							"value": "1.0"
+						},
+						{
+							"key": "format",
+							"value": "png"
+						},
+						{
+							"key": "version",
+							"value": "2.9.3"
+						}
+					]
+				},
+				"description": "A simple bar chart using a GET request."
+			},
+			"response": []
+		},
+		{
+			"name": "Simple chart (POST)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"backgroundColor\": \"#fff\",\n  \"width\": 500,\n  \"height\": 300,\n  \"devicePixelRatio\": 1.0,\n  \"chart\": {\n    \"type\": \"bar\",\n    \"data\": {\n      \"labels\": [2012, 2013, 2014, 2015, 2016],\n      \"datasets\": [\n        {\n          \"label\": \"Users\",\n          \"data\": [120, 60, 50, 180, 120]\n        }\n      ]\n    }\n  }\n}"
+				},
+				"url": {
+					"raw": "https://quickchart.io/chart",
+					"protocol": "https",
+					"host": [
+						"quickchart",
+						"io"
+					],
+					"path": [
+						"chart"
+					]
+				},
+				"description": "A simple bar chart using a POST request."
+			},
+			"response": []
+		},
+		{
+			"name": "Chart with function",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://quickchart.io/chart?chart=%7B%0A%20%20type%3A%20'bar'%2C%0A%20%20data%3A%20%7B%0A%20%20%20%20labels%3A%20%5B'Q1'%2C%20'Q2'%2C%20'Q3'%2C%20'Q4'%5D%2C%0A%20%20%20%20datasets%3A%20%5B%7B%0A%20%20%20%20%20%20label%3A%20'Users'%2C%0A%20%20%20%20%20%20data%3A%20%5B50%2C%2060%2C%2070%2C%20180%5D%0A%20%20%20%20%7D%2C%20%7B%0A%20%20%20%20%20%20label%3A%20'Revenue'%2C%0A%20%20%20%20%20%20data%3A%20%5B100%2C%20200%2C%20300%2C%20400%5D%0A%20%20%20%20%7D%5D%0A%20%20%7D%2C%0A%20%20options%3A%20%7B%0A%20%20%20%20scales%3A%20%7B%0A%20%20%20%20%20%20yAxes%3A%20%5B%7B%0A%20%20%20%20%20%20%20%20ticks%3A%20%7B%0A%20%20%20%20%20%20%20%20%20%20callback%3A%20(val)%20%3D%3E%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20return%20val%20%2B%20'k'%3B%0A%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%7D%5D%0A%20%20%20%20%7D%0A%20%20%7D%0A%7D&backgroundColor=%23fff&width=500&height=300&devicePixelRatio=1.0&format=png&version=2.9.3",
+					"protocol": "https",
+					"host": [
+						"quickchart",
+						"io"
+					],
+					"path": [
+						"chart"
+					],
+					"query": [
+						{
+							"key": "chart",
+							"value": "%7B%0A%20%20type%3A%20'bar'%2C%0A%20%20data%3A%20%7B%0A%20%20%20%20labels%3A%20%5B'Q1'%2C%20'Q2'%2C%20'Q3'%2C%20'Q4'%5D%2C%0A%20%20%20%20datasets%3A%20%5B%7B%0A%20%20%20%20%20%20label%3A%20'Users'%2C%0A%20%20%20%20%20%20data%3A%20%5B50%2C%2060%2C%2070%2C%20180%5D%0A%20%20%20%20%7D%2C%20%7B%0A%20%20%20%20%20%20label%3A%20'Revenue'%2C%0A%20%20%20%20%20%20data%3A%20%5B100%2C%20200%2C%20300%2C%20400%5D%0A%20%20%20%20%7D%5D%0A%20%20%7D%2C%0A%20%20options%3A%20%7B%0A%20%20%20%20scales%3A%20%7B%0A%20%20%20%20%20%20yAxes%3A%20%5B%7B%0A%20%20%20%20%20%20%20%20ticks%3A%20%7B%0A%20%20%20%20%20%20%20%20%20%20callback%3A%20(val)%20%3D%3E%20%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20return%20val%20%2B%20'k'%3B%0A%20%20%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%7D%5D%0A%20%20%20%20%7D%0A%20%20%7D%0A%7D",
+							"description": "The Chart.js definition for this bar chart. Note that this parameter is URI-encoded (right click and select \"EncodeURIComponent\")"
+						},
+						{
+							"key": "backgroundColor",
+							"value": "%23fff",
+							"description": "Note that this parameter is URI-encoded (right click and select \"EncodeURIComponent\")"
+						},
+						{
+							"key": "width",
+							"value": "500"
+						},
+						{
+							"key": "height",
+							"value": "300"
+						},
+						{
+							"key": "devicePixelRatio",
+							"value": "1.0"
+						},
+						{
+							"key": "format",
+							"value": "png"
+						},
+						{
+							"key": "version",
+							"value": "2.9.3"
+						}
+					]
+				},
+				"description": "Generate a more complex chart.  In this case, we add a \"k\" suffix to the Y-axis values."
+			},
+			"response": []
+		},
+		{
+			"name": "Chart with function (POST)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"backgroundColor\": \"#fff\",\n  \"width\": 500,\n  \"height\": 300,\n  \"devicePixelRatio\": 1.0,\n  \"chart\": \"{ type: 'bar', data: { labels: ['Q1', 'Q2', 'Q3', 'Q4'], datasets: [ { label: 'Users', data: [50, 60, 70, 180], }, { label: 'Revenue', data: [100, 200, 300, 400], }, ], }, options: { scales: { yAxes: [ { ticks: { callback: (val) => { return val + 'k'; }, }, }, ], }, }, }\"\n}\n"
+				},
+				"url": {
+					"raw": "https://quickchart.io/chart",
+					"protocol": "https",
+					"host": [
+						"quickchart",
+						"io"
+					],
+					"path": [
+						"chart"
+					]
+				},
+				"description": "Generate a more complex chart.  In this case, we add a \"k\" suffix to the Y-axis values."
+			},
+			"response": []
+		},
+		{
+			"name": "Gradient fill",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://quickchart.io/chart?chart={\n    \"type\": \"bar\",\n    \"data\": {\n        \"labels\": [\"Hello world\", \"Test\"],\n        \"datasets\": [{\n            \"label\": \"Foo\",\n            \"data\": [1, 2],\n            \"backgroundColor\": getGradientFillHelper('vertical', ['rgba(63, 100, 249, 0.2)', 'rgba(255, 255, 255, 0.2)'])\n        }]\n    }\n}",
+					"protocol": "https",
+					"host": [
+						"quickchart",
+						"io"
+					],
+					"path": [
+						"chart"
+					],
+					"query": [
+						{
+							"key": "chart",
+							"value": "{\n    \"type\": \"bar\",\n    \"data\": {\n        \"labels\": [\"Hello world\", \"Test\"],\n        \"datasets\": [{\n            \"label\": \"Foo\",\n            \"data\": [1, 2],\n            \"backgroundColor\": getGradientFillHelper('vertical', ['rgba(63, 100, 249, 0.2)', 'rgba(255, 255, 255, 0.2)'])\n        }]\n    }\n}",
+							"description": "The Chart.js definition for this bar chart"
+						}
+					]
+				},
+				"description": "Use the gradient function to generate a chart."
+			},
+			"response": []
+		},
+		{
+			"name": "Gradient fill (POST)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"chart\": \"{ type: 'bar', data: { labels: ['Hello world', 'Test'], datasets: [ { label: 'Foo', data: [1, 2], backgroundColor: getGradientFillHelper('vertical', [ 'rgba(63, 100, 249, 0.2)', 'rgba(255, 255, 255, 0.2)', ]), }, ], }, } \"\n}"
+				},
+				"url": {
+					"raw": "https://quickchart.io/chart",
+					"protocol": "https",
+					"host": [
+						"quickchart",
+						"io"
+					],
+					"path": [
+						"chart"
+					]
+				},
+				"description": "Use the gradient function to generate a chart."
+			},
+			"response": []
+		},
+		{
+			"name": "QR code",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://quickchart.io/qr?text=abc123",
+					"protocol": "https",
+					"host": [
+						"quickchart",
+						"io"
+					],
+					"path": [
+						"qr"
+					],
+					"query": [
+						{
+							"key": "text",
+							"value": "abc123"
+						}
+					]
+				},
+				"description": "A simple QR code using a GET request."
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}

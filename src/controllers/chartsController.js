@@ -21,14 +21,16 @@ export async function handleChartsGenerate(req, res) {
     const result = await generateCharts(prompt, req.userId, { uploads, includeSearch });
 
     if (!result.ok) {
-      return res.status(502).json({ error: result.error || 'Failed to generate charts', raw: result.raw });
+      return res.status(500).json({
+        ok: false,
+        error: result.error || 'Failed to generate chart',
+        processingTime: result.processingTime || null,
+      });
     }
 
     return res.json({
-      ok: true,
-      chart: result.chart,
-      raw: result.raw,
-      processingTime: result.processingTime
+      chartUrl: result.chartUrl,
+      quickChartSuccess: result.quickChartSuccess,
     });
   } catch (error) {
     console.error('Error in handleChartsGenerate:', error);
@@ -36,7 +38,7 @@ export async function handleChartsGenerate(req, res) {
   }
 }
 
-// Run chat (non-stream) and charts generation in parallel and return both together
+
 export async function handleChatWithChartsParallel(req, res) {
   try {
     const { prompt, conversationId } = req.body || {};
@@ -58,29 +60,18 @@ export async function handleChatWithChartsParallel(req, res) {
         includeSearch,
         uploads,
         resetHistory: uploads.length > 0 && options.keepHistoryWithFiles !== true,
-        expert: options.expert || 'research',
+        expert: options.expert,
         systemPrompt: options.systemPrompt
       }),
       generateCharts(prompt, userId, { includeSearch, uploads })
     ]);
 
-    const chat = chatRes.status === 'fulfilled' ? chatRes.value : { error: chatRes.reason?.message || 'Chat generation failed' };
     const charts = chartsRes.status === 'fulfilled' ? chartsRes.value : { ok: false, error: chartsRes.reason?.message || 'Charts generation failed' };
 
     return res.json({
-      chat: {
-        content: chat?.content || chat?.text || '',
-        sources: Array.isArray(chat?.sources) ? chat.sources : [],
-        error: chat?.error || null,
-        attempts: chat?.attempts || 1,
-        processingTime: chat?.processingTime || null
-      },
       charts: {
-        ok: charts?.ok === true,
         chart: charts?.chart || null,
-        raw: charts?.raw || null,
-        error: charts?.ok === true ? null : (charts?.error || 'Failed to generate charts'),
-        processingTime: charts?.processingTime || null
+        error: charts?.ok === true ? null : (charts?.error || 'Failed to generate charts')
       }
     });
   } catch (error) {
