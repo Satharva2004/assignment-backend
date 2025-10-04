@@ -6,6 +6,21 @@ import env from '../config/env.js';
 
 const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
 
+// Helper function to fetch page title
+async function fetchPageTitle(url) {
+  try {
+    const response = await fetch(url, { 
+      timeout: 3000,
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    const html = await response.text();
+    const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    return match ? match[1].trim() : url;
+  } catch {
+    return url;
+  }
+}
+
 // Generate chat response and store in conversation
 export async function handleChatGenerate(req, res) {
   try {
@@ -158,6 +173,7 @@ export async function handleChatStreamGenerate(req, res) {
     let currentConversationId = conversationId;
     let streamedContent = '';
     const streamedSources = new Set();
+    let finalSourcesWithTitles = []; // Store final sources to save to DB
 
     // If no conversation ID provided, create a new conversation
     if (!currentConversationId) {
@@ -311,17 +327,16 @@ export async function handleChatStreamGenerate(req, res) {
           // Resolve titles for sources concurrently (limit simple)
           const urls = Array.from(streamedSources);
           const titlePromises = urls.map(async (u) => ({ url: u, title: await fetchPageTitle(u) }));
-          let sourcesWithTitles = [];
           try {
-            sourcesWithTitles = await Promise.all(titlePromises);
+            finalSourcesWithTitles = await Promise.all(titlePromises);
           } catch (_) {
-            sourcesWithTitles = urls.map(u => ({ url: u }));
+            finalSourcesWithTitles = urls.map(u => ({ url: u }));
           }
 
           // Emit structured sources event
-          console.log('[chatStream] sourcesWithTitles:', sourcesWithTitles);
+          console.log('[chatStream] sourcesWithTitles:', finalSourcesWithTitles);
           res.write(`event: sources\n`);
-          res.write(`data: ${JSON.stringify({ sources: sourcesWithTitles })}\n\n`);
+          res.write(`data: ${JSON.stringify({ sources: finalSourcesWithTitles })}\n\n`);
         } else {
           console.log('[chatStream] no streamed grounding sources found; attempting fallback generateContent for sources');
           // Fallback: perform a quick non-stream call to obtain sources
@@ -331,12 +346,12 @@ export async function handleChatStreamGenerate(req, res) {
               includeSearch,
               uploads: files,
             });
-            const sourcesWithTitles = Array.isArray(gen?.sources) ? gen.sources : [];
-            if (sourcesWithTitles.length > 0) {
-              console.log(`[chatStream] fallback produced sources: count=${sourcesWithTitles.length}`);
+            finalSourcesWithTitles = Array.isArray(gen?.sources) ? gen.sources : [];
+            if (finalSourcesWithTitles.length > 0) {
+              console.log(`[chatStream] fallback produced sources: count=${finalSourcesWithTitles.length}`);
               if (!res.writableEnded) {
                 res.write(`event: sources\n`);
-                res.write(`data: ${JSON.stringify({ sources: sourcesWithTitles })}\n\n`);
+                res.write(`data: ${JSON.stringify({ sources: finalSourcesWithTitles })}\n\n`);
               }
             } else {
               console.log('[chatStream] fallback produced no sources');
@@ -359,7 +374,7 @@ export async function handleChatStreamGenerate(req, res) {
         console.warn('Failed to emit sources/title message:', e?.message || e);
       }
       
-      // Save messages to database after streaming completes
+      // Save messages to database after streaming completes WITH SOURCES
       try {
         const { error: saveError } = await supabase
           .from('messages')
@@ -374,12 +389,14 @@ export async function handleChatStreamGenerate(req, res) {
               conversation_id: currentConversationId,
               role: 'model',
               content: streamedContent,
-              sources: [] // Could extract sources from stream if needed
+              sources: finalSourcesWithTitles // NOW SAVING SOURCES!
             }
           ]);
           
         if (saveError) {
           console.error('Error saving streamed messages:', saveError);
+        } else {
+          console.log(`[chatStream] Successfully saved messages with ${finalSourcesWithTitles.length} sources`);
         }
 
         // Update conversation timestamp
