@@ -2,24 +2,10 @@
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
 import { generateContent, buildRequestBody, MODEL_ID, BASE_URL, extractTextFromUploads, extractImagesFromUploads } from '../helpers/gemini.js';
+import { RESEARCH_ASSISTANT_PROMPT } from '../prompts/researchAssistantPrompt.js';
 import env from '../config/env.js';
 
 const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
-
-// Helper function to fetch page title
-async function fetchPageTitle(url) {
-  try {
-    const response = await fetch(url, { 
-      timeout: 3000,
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    });
-    const html = await response.text();
-    const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    return match ? match[1].trim() : url;
-  } catch {
-    return url;
-  }
-}
 
 // Generate chat response and store in conversation
 export async function handleChatGenerate(req, res) {
@@ -41,6 +27,21 @@ export async function handleChatGenerate(req, res) {
     const userId = req.userId;
     let currentConversationId = conversationId;
     
+    // After getting the userId from req.userId
+    const { data: userData, error: userError } = await supabase
+    .from('users')
+    .select('username, email') // Select the fields you need
+    .eq('id', userId)
+    .single();
+
+    if (userError) {
+    console.error('Error fetching user data:', userError);
+    // Handle error or continue without username
+    }
+
+    const username = userData?.username || '';
+    const userEmail = userData?.email || '';
+
     // If no conversation ID provided, create a new conversation
     if (!currentConversationId) {
       const { data: conversation, error: convError } = await supabase
@@ -96,6 +97,7 @@ export async function handleChatGenerate(req, res) {
       history: chatHistory.slice(-10), // Only keep last 10 messages for context
       includeSearch: effectiveIncludeSearch,
       uploads,
+      username,
       // Reset history when new files arrive unless explicitly kept
       resetHistory: uploads.length > 0 && options.keepHistoryWithFiles !== true
     });
@@ -174,7 +176,20 @@ export async function handleChatStreamGenerate(req, res) {
     let streamedContent = '';
     const streamedSources = new Set();
     let finalSourcesWithTitles = []; // Store final sources to save to DB
+    // After getting the userId from req.userId
+    const { data: userData, error: userError } = await supabase
+    .from('users')
+    .select('username, email') // Select the fields you need
+    .eq('id', userId)
+    .single();
 
+    if (userError) {
+    console.error('Error fetching user data:', userError);
+    // Handle error or continue without username
+    }
+
+    const username = userData?.username || 'Anonymous';
+    const userEmail = userData?.email || '';
     // If no conversation ID provided, create a new conversation
     if (!currentConversationId) {
       const { data: conversation, error: convError } = await supabase
@@ -242,7 +257,7 @@ export async function handleChatStreamGenerate(req, res) {
     // Default includeSearch to false when files exist unless explicitly overridden
     const files = Array.isArray(req.files) ? req.files : [];
     const includeSearch = typeof options.includeSearch === 'boolean' ? options.includeSearch : (files.length === 0);
-    const systemPrompt = options.systemPrompt || undefined;
+    const systemPrompt = options.systemPrompt || RESEARCH_ASSISTANT_PROMPT({ username });
 
     const body = buildRequestBody(chatHistory.slice(-10), systemPrompt, includeSearch);
     const url = `${BASE_URL}/${MODEL_ID}:streamGenerateContent?alt=sse&key=${env.GEMINI_API_KEY}`;
@@ -345,6 +360,7 @@ export async function handleChatStreamGenerate(req, res) {
               history: chatHistory.slice(-10),
               includeSearch,
               uploads: files,
+              username,
             });
             finalSourcesWithTitles = Array.isArray(gen?.sources) ? gen.sources : [];
             if (finalSourcesWithTitles.length > 0) {

@@ -632,27 +632,18 @@ export async function generateContent(
     // Select the appropriate system prompt based on expert type
     const expertType = (options.expert || 'research').toLowerCase();
     const customSystemPrompt = options.systemPrompt;
-    const selectedSystemPrompt = customSystemPrompt || EXPERT_PROMPTS[expertType] || EXPERT_PROMPTS.default;
-    
-    console.log('=== Expert Selection ===');
-    console.log('Requested expert type:', expertType);
-    console.log('Available expert types:', Object.keys(EXPERT_PROMPTS));
-    console.log('Using custom system prompt:', customSystemPrompt ? 'Yes' : 'No');
-    
-    if (customSystemPrompt) {
-      console.log('Using provided custom system prompt');
-    } else if (EXPERT_PROMPTS[expertType]) {
-      console.log(`Using expert prompt for: ${expertType}`);
-      console.log('Prompt starts with:', EXPERT_PROMPTS[expertType].substring(0, 100) + '...');
-    } else {
-      console.warn(`Unknown expert type: ${expertType}. Using default research assistant prompt.`);
-      console.log('Default prompt starts with:', EXPERT_PROMPTS.default.substring(0, 100) + '...');
-    }
-
-    // Reset history on demand (e.g., when new files are uploaded) to avoid stale context bleed
-    if (options.resetHistory) {
-      console.log(`Resetting chat history for userId=${userId} due to resetHistory option`);
-      chatHistory.clear(userId);
+    let selectedSystemPrompt = customSystemPrompt;
+    if (!selectedSystemPrompt) {
+      const promptEntry = EXPERT_PROMPTS[expertType] || EXPERT_PROMPTS.default;
+      if (typeof promptEntry === 'function') {
+        try {
+          selectedSystemPrompt = promptEntry({ username: options.username || 'User' });
+        } catch (_) {
+          selectedSystemPrompt = '';
+        }
+      } else {
+        selectedSystemPrompt = promptEntry;
+      }
     }
 
     // Get user history and prepare messages
